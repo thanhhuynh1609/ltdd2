@@ -24,6 +24,7 @@ class _AddProductState extends State<AddProduct> {
   TextEditingController nameController = TextEditingController();
   TextEditingController priceController = TextEditingController();
   TextEditingController detailController = TextEditingController();
+  bool isLoading = false;
 
   // Chọn ảnh từ thư viện
   Future<void> getImage() async {
@@ -47,47 +48,63 @@ class _AddProductState extends State<AddProduct> {
   // Upload sản phẩm
   Future<void> uploadItem() async {
     if ((selectedImage != null || selectedImageBytes != null) &&
-        nameController.text.isNotEmpty) {
-      String addId = randomAlphaNumeric(10);
+        nameController.text.isNotEmpty &&
+        value != null) {  // Kiểm tra value có null không
+      
+      // Hiển thị loading
+      setState(() {
+        isLoading = true;
+      });
 
-      // Chuyển đổi ảnh thành Base64
-      String? base64Image;
-      if (kIsWeb && selectedImageBytes != null) {
-        base64Image = base64Encode(selectedImageBytes!);
-      } else if (selectedImage != null) {
-        base64Image = base64Encode(await selectedImage!.readAsBytes());
-      }
+      try {
+        // Chuyển đổi ảnh thành Base64
+        String? base64Image;
+        if (kIsWeb && selectedImageBytes != null) {
+          base64Image = base64Encode(selectedImageBytes!);
+        } else if (selectedImage != null) {
+          base64Image = base64Encode(await selectedImage!.readAsBytes());
+        }
 
-      if (base64Image == null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          backgroundColor: Colors.red,
-          content: Text(
-            "Error converting image to Base64.",
-            style: TextStyle(fontSize: 18),
-          ),
-        ));
-        return;
-      }
-      String firstletter = nameController.text.substring(0,1).toUpperCase();
-      // Thêm sản phẩm vào cơ sở dữ liệu
-      Map<String, dynamic> addProduct = {
-        "Name": nameController.text,
-        "Image": base64Image,
-        "SearchKey": firstletter,
-        "UpdateName": nameController.text.toUpperCase(),
-        "Price": priceController.text,
-        "Detail": detailController.text,
-        // "Category": value,
-      };
+        if (base64Image == null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            backgroundColor: Colors.red,
+            content: Text(
+              "Error converting image to Base64.",
+              style: TextStyle(fontSize: 18),
+            ),
+          ));
+          return;
+        }
+        
+        String firstletter = nameController.text.substring(0,1).toUpperCase();
+        
+        // Thêm sản phẩm vào cơ sở dữ liệu
+        Map<String, dynamic> addProduct = {
+          "Name": nameController.text,
+          "Image": base64Image,
+          "SearchKey": firstletter,
+          "UpdateName": nameController.text.toUpperCase(),
+          "Price": priceController.text,
+          "Detail": detailController.text,
+          "Category": value,
+        };
 
-      await DatabaseMethods().addProduct(addProduct, value!).then((_) async{
+        // Thêm vào collection danh mục
+        await DatabaseMethods().addProduct(addProduct, value!);
+        
+        // Thêm vào collection Products
         await DatabaseMethods().addAllProducts(addProduct);
+        
+        // Reset form
         setState(() {
           selectedImage = null;
           selectedImageBytes = null;
           nameController.clear();
-          value = null;
+          priceController.clear();
+          detailController.clear();
+          // Không reset value để người dùng có thể tiếp tục thêm sản phẩm cùng danh mục
         });
+        
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           backgroundColor: Colors.green,
           content: Text(
@@ -95,12 +112,24 @@ class _AddProductState extends State<AddProduct> {
             style: TextStyle(fontSize: 20),
           ),
         ));
-      });
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(
+            "Error uploading product: $e",
+            style: TextStyle(fontSize: 18),
+          ),
+        ));
+      } finally {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         backgroundColor: Colors.red,
         content: Text(
-          "Please fill all fields and select an image.",
+          "Please fill all fields, select an image, and choose a category.",
           style: TextStyle(fontSize: 18),
         ),
       ));

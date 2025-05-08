@@ -80,4 +80,61 @@ class DatabaseMethods {
             isEqualTo: updatename.substring(0, 1).toUpperCase())
         .get();
   }
+
+  // Lấy tất cả sản phẩm
+  Future<Stream<QuerySnapshot>> getAllProducts() async {
+    return FirebaseFirestore.instance.collection("Products").snapshots();
+  }
+
+  // Cập nhật sản phẩm
+  Future updateProduct(String productId, Map<String, dynamic> updateInfo) async {
+    return await FirebaseFirestore.instance
+        .collection("Products")
+        .doc(productId)
+        .update(updateInfo);
+  }
+
+  // Xóa sản phẩm
+  Future deleteProduct(String productId) async {
+    return await FirebaseFirestore.instance
+        .collection("Products")
+        .doc(productId)
+        .delete();
+  }
+
+  // Xóa sản phẩm trong collection danh mục
+  Future deleteProductFromCategory(String productId, String category) async {
+    return await FirebaseFirestore.instance
+        .collection(category)
+        .doc(productId)
+        .delete();
+  }
+
+  // Cập nhật sản phẩm trong collection danh mục
+  Future updateProductInCategory(String productId, String category, Map<String, dynamic> updateInfo) async {
+    try {
+      // Kiểm tra xem document có tồn tại không
+      DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
+          .collection(category)
+          .doc(productId)
+          .get();
+      
+      if (docSnapshot.exists) {
+        // Nếu tồn tại thì cập nhật
+        return await FirebaseFirestore.instance
+            .collection(category)
+            .doc(productId)
+            .update(updateInfo);
+      } else {
+        // Nếu không tồn tại thì thêm mới
+        return await FirebaseFirestore.instance
+            .collection(category)
+            .doc(productId)
+            .set(updateInfo);
+      }
+    } catch (e) {
+      print("Lỗi khi cập nhật sản phẩm trong danh mục: $e");
+      return null;
+    }
+  }
 }
