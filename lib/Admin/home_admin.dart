@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shopping_app/Admin/add_product.dart';
 import 'package:shopping_app/Admin/all_orders.dart';
 import 'package:shopping_app/Admin/manage_products.dart';
+import 'package:shopping_app/Admin/manage_users.dart';
 
 class HomeAdmin extends StatefulWidget {
   const HomeAdmin({super.key});
@@ -55,6 +56,17 @@ class _HomeAdminState extends State<HomeAdmin> {
               onTap: () {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => AllOrders()));
+              },
+            ),
+            SizedBox(height: 20.0),
+            
+            // Nút quản lý người dùng
+            _buildAdminButton(
+              icon: Icons.people,
+              title: "Quản lý người dùng",
+              onTap: () {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => ManageUsers()));
               },
             ),
           ],

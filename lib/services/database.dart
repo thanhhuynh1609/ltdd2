@@ -137,4 +137,17 @@ class DatabaseMethods {
       return null;
     }
   }
+
+  // Lấy tất cả người dùng
+  Future<Stream<QuerySnapshot>> getAllUsers() async {
+    return FirebaseFirestore.instance.collection("user").snapshots();
+  }
+
+  // Xóa người dùng
+  Future deleteUser(String userId) async {
+    return await FirebaseFirestore.instance
+        .collection("user")
+        .doc(userId)
+        .delete();
+  }
 }
