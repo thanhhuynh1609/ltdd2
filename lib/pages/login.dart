@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shopping_app/Admin/admin_login.dart';
 import 'package:shopping_app/pages/bottomnav.dart';
 import 'package:shopping_app/pages/signup.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
@@ -83,9 +84,12 @@ class _LoginState extends State<Login> {
     }
   }
 
+  bool isChecked = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Container(
           margin: EdgeInsets.only(top: 40, left: 20, right: 20, bottom: 40),
@@ -94,22 +98,23 @@ class _LoginState extends State<Login> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset("images/logo03.png"),
-                Center(
-                    child: Text(
-                  "Sign In",
+                Image.asset(
+                    "images/logook.png",
+                  width: 170,
+                ),
+                SizedBox(height: 20,),
+                Text(
+                  "Welcome back,",
                   style: AppWidget.semiboldTextFeildStyle(),
-                )),
+                ),
                 SizedBox(height: 20),
                 Text(
-                  "Please enter the details below to\n                     continue.",
-                  style: AppWidget.lightTextFeildStyle(),
-                ),
+                    "Discover Limitiess Choices and Unmatched Convenience.",
+                    style: AppWidget.lightTextFeildStyle(),
+                  ),
                 SizedBox(height: 40),
-                Text("Email", style: AppWidget.semiboldTextFeildStyle()),
-                SizedBox(height: 20),
                 Container(
-                  padding: EdgeInsets.only(left: 20),
+                  // padding: EdgeInsets.only(left: 20),
                   decoration: BoxDecoration(
                       color: Color(0xfff4f5f9),
                       borderRadius: BorderRadius.circular(10)),
@@ -122,18 +127,25 @@ class _LoginState extends State<Login> {
                     },
                     controller: mailcontroller,
                     decoration: InputDecoration(
-                        border: InputBorder.none, hintText: "Email"),
+                        prefixIcon: Icon(Icons.email_outlined, color: Colors.grey,),
+                        border: InputBorder.none,
+                        hintText: "Email",
+                        hintStyle: TextStyle(
+                          color: Colors.grey
+                        ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 20),),
                   ),
                 ),
                 SizedBox(height: 20),
-                Text("Password", style: AppWidget.semiboldTextFeildStyle()),
+                // Text("Password", style: AppWidget.semiboldTextFeildStyle()),
                 SizedBox(height: 20),
                 Container(
-                  padding: EdgeInsets.only(left: 20),
+                  // padding: EdgeInsets.only(left: 20),
                   decoration: BoxDecoration(
                       color: Color(0xfff4f5f9),
                       borderRadius: BorderRadius.circular(10)),
                   child: TextFormField(
+                    obscureText: true,
                     controller: passwordcontroller,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -142,19 +154,55 @@ class _LoginState extends State<Login> {
                       return null;
                     },
                     decoration: InputDecoration(
-                        border: InputBorder.none, hintText: "Password"),
+                        prefixIcon: Icon(Icons.password_outlined, color: Colors.grey,),
+                        border: InputBorder.none,
+                        hintText: "Password",
+                        hintStyle: TextStyle(
+                          color: Colors.grey
+                        ),
+                        contentPadding: EdgeInsets.symmetric(vertical: 20),),
                   ),
                 ),
                 SizedBox(height: 29),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Forgot Password?",
-                      style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Checkbox(
+                      value: isChecked,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          isChecked = value!;
+                        });
+                      },
+                      activeColor: Color(0xff4b69fe), // màu khi tick
+                      checkColor: Colors.white,  // màu dấu tick
+                                      ),
+                      Text(
+                        "Remember me!",
+                        style: TextStyle(
+                          color: Color(0xff7e7e7e),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold
+                        ),
+                      )
+                    ],
+                  ),
+                    GestureDetector(
+                      onTap: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => AdminLogin()));
+                        },
+                      child: Text(
+                        "Forgot Password?",
+                        style: TextStyle(
+                            color: Color(0xFFb8b4cc),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -171,45 +219,85 @@ class _LoginState extends State<Login> {
                   },
                   child: Center(
                     child: Container(
-                      width: MediaQuery.of(context).size.width / 2,
-                      padding: EdgeInsets.all(18),
+                      width: MediaQuery.of(context).size.width,
+                      padding: EdgeInsets.all(15),
                       decoration: BoxDecoration(
-                          color: Colors.green,
+                          color: Color(0xff4b69fe),
                           borderRadius: BorderRadius.circular(20)),
                       child: Center(
                           child: Text(
-                        "LOGIN",
+                        "Login",
                         style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 17,
                             fontWeight: FontWeight.bold),
                       )),
                     ),
                   ),
                 ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Don't have an account? ",
-                      style: AppWidget.lightTextFeildStyle(),
+                SizedBox(height: 20,),
+                GestureDetector(
+                  onTap: (){
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => SignUp()));
+                  },
+                  child: Center(
+                    child: Container(
+                      width: MediaQuery.of(context).size.width,
+                      padding: EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.grey,
+                            width: 1
+                          )
+                      ),
+                      child: Center(
+                          child: Text(
+                            "Create Account",
+                            style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 17,
+                                // fontWeight: FontWeight.bold
+                            ),
+                          )),
                     ),
-                    GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => SignUp()));
-                        },
-                        child: Text(
-                          "Sign up",
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
-                        )),
-                  ],
+                  ),
+                ),
+                SizedBox(height: 20),
+                Center(
+                  child: Text("or sign in with", style: TextStyle(fontSize: 15),),
+                ),
+                SizedBox(height: 20,),
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.grey,
+                            width: 1
+                          )
+                        ),
+                        child: Image.asset("images/fb.png", width: 30,),
+                      ),
+                      SizedBox(width: 20,),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.grey,
+                                width: 1
+                            )
+                        ),
+                        child: Image.asset("images/gg.png", width: 30,),
+                      ),
+                    ],
+                  ),
                 )
               ],
             ),
