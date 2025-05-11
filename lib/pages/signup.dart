@@ -75,6 +75,7 @@ class _SignUpState extends State<SignUp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Container(
           margin: EdgeInsets.only(top: 40, left: 20, right: 20, bottom: 40),
@@ -83,17 +84,14 @@ class _SignUpState extends State<SignUp> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset("images/login.png"),
-                Center(
-                    child: Text("Sign Up", style: AppWidget.semiboldTextFeildStyle())),
+                Image.asset("images/logook.png", width: 170,),
+                SizedBox(height: 20,),
+                Text("Let’s Get Started!", style: AppWidget.semiboldTextFeildStyle()),
                 SizedBox(height: 20),
-                Text("Please enter the details below to\n                     continue.",
-                    style: AppWidget.lightTextFeildStyle()),
+                Text("Please enter the details below to continue.",
+                      style: AppWidget.lightTextFeildStyle()),
                 SizedBox(height: 40),
-                Text("Name", style: AppWidget.semiboldTextFeildStyle()),
-                SizedBox(height: 20),
                 Container(
-                  padding: EdgeInsets.only(left: 20),
                   decoration: BoxDecoration(
                       color: Color(0xfff4f5f9), borderRadius: BorderRadius.circular(10)),
                   child: TextFormField(
@@ -104,14 +102,16 @@ class _SignUpState extends State<SignUp> {
                       return null;
                     },
                     controller: namecontroller,
-                    decoration: InputDecoration(border: InputBorder.none, hintText: "Name"),
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.account_box_outlined, color: Colors.grey,),
+                        border: InputBorder.none,
+                        hintText: "Name",
+                        contentPadding: EdgeInsets.symmetric(vertical: 20),
+                    ),
                   ),
                 ),
-                SizedBox(height: 20),
-                Text("Email", style: AppWidget.semiboldTextFeildStyle()),
-                SizedBox(height: 20),
+                SizedBox(height: 40),
                 Container(
-                  padding: EdgeInsets.only(left: 20),
                   decoration: BoxDecoration(
                       color: Color(0xfff4f5f9), borderRadius: BorderRadius.circular(10)),
                   child: TextFormField(
@@ -122,14 +122,16 @@ class _SignUpState extends State<SignUp> {
                       return null;
                     },
                     controller: mailcontroller,
-                    decoration: InputDecoration(border: InputBorder.none, hintText: "Email"),
+                    decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.email_outlined, color: Colors.grey,),
+                        border: InputBorder.none,
+                        hintText: "Email",
+                      contentPadding: EdgeInsets.symmetric(vertical: 20),
+                    ),
                   ),
                 ),
-                SizedBox(height: 20),
-                Text("Password", style: AppWidget.semiboldTextFeildStyle()),
-                SizedBox(height: 20),
+                SizedBox(height: 40),
                 Container(
-                  padding: EdgeInsets.only(left: 20),
                   decoration: BoxDecoration(
                       color: Color(0xfff4f5f9), borderRadius: BorderRadius.circular(10)),
                   child: TextFormField(
@@ -141,7 +143,12 @@ class _SignUpState extends State<SignUp> {
                       return null;
                     },
                     controller: passwordcontroller,
-                    decoration: InputDecoration(border: InputBorder.none, hintText: "Password"),
+                    decoration: InputDecoration(
+                        prefixIcon: Icon(Icons.password_outlined, color: Colors.grey,),
+                        border: InputBorder.none,
+                        hintText: "Password",
+                        contentPadding: EdgeInsets.symmetric(vertical: 20),
+                    ),
                   ),
                 ),
                 SizedBox(height: 30),
@@ -158,12 +165,12 @@ class _SignUpState extends State<SignUp> {
                   },
                   child: Center(
                     child: Container(
-                      width: MediaQuery.of(context).size.width / 2,
+                      width: MediaQuery.of(context).size.width,
                       padding: EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                          color: Colors.green, borderRadius: BorderRadius.circular(20)),
+                          color: Color(0xff4b69fe), borderRadius: BorderRadius.circular(20)),
                       child: Center(
-                          child: Text("SIGN UP",
+                          child: Text("Sign Up",
                               style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -184,11 +191,46 @@ class _SignUpState extends State<SignUp> {
                       },
                       child: Text("Sign in",
                           style: TextStyle(
-                              color: Colors.green,
+                              color: Color(0xff4b69fe),
                               fontSize: 18,
                               fontWeight: FontWeight.bold)),
                     ),
                   ],
+                ),
+                SizedBox(height: 20,),
+                Center(
+                  child: Text("or sign in with", style: TextStyle(fontSize: 15),),
+                ),
+                SizedBox(height: 20,),
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.grey,
+                                width: 1
+                            )
+                        ),
+                        child: Image.asset("images/fb.png", width: 30,),
+                      ),
+                      SizedBox(width: 20,),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.grey,
+                                width: 1
+                            )
+                        ),
+                        child: Image.asset("images/gg.png", width: 30,),
+                      ),
+                    ],
+                  ),
                 )
               ],
             ),
