@@ -1,15 +1,15 @@
-import 'dart:convert';  // Để sử dụng base64Decode
-import 'dart:typed_data';  // Để sử dụng Uint8List
-
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:shopping_app/pages/cart_page.dart';
 import 'package:shopping_app/pages/product_detail.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
-import 'package:shopping_app/services/database.dart';
+import 'package:shopping_app/services/cart_service.dart';
 
 class CategoryProduct extends StatefulWidget {
-  String category;
-  CategoryProduct({required this.category});
+  final String category;
+  const CategoryProduct({super.key, required this.category});
 
   @override
   State<CategoryProduct> createState() => _CategoryProductState();
@@ -18,16 +18,38 @@ class CategoryProduct extends StatefulWidget {
 class _CategoryProductState extends State<CategoryProduct> {
   Stream? CategoryStream;
 
-  // Hàm lấy dữ liệu từ Firestore
-  getontheload() async {
-    CategoryStream = await DatabaseMethods().getProducts(widget.category);
+  @override
+  void initState() {
+    getCategoryProducts();
+    super.initState();
+  }
+
+  getCategoryProducts() async {
+    CategoryStream = FirebaseFirestore.instance
+        .collection(widget.category)
+        .snapshots();
     setState(() {});
   }
 
-  @override
-  void initState() {
-    getontheload();
-    super.initState();
+  // Hàm thêm sản phẩm vào giỏ hàng
+  void addToCart(String name, String price, String imageBase64, String detail) {
+    // Chuyển đổi giá từ String sang double
+    double priceValue = double.tryParse(price) ?? 0.0;
+    
+    // Tạo đối tượng CartItem
+    CartItem item = CartItem(
+      brand: widget.category,
+      name: name,
+      color: "",
+      size: "",
+      price: priceValue,
+      quantity: 1,
+      image: imageBase64,
+      detail: detail,
+    );
+    
+    // Thêm vào giỏ hàng
+    CartService.addToCart(item);
   }
 
   // Hàm hiển thị sản phẩm từ Firestore
@@ -52,58 +74,124 @@ class _CategoryProductState extends State<CategoryProduct> {
                   Uint8List bytes = base64Decode(base64Image);
 
                   return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    margin: EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                        color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 10,),
-                        // Hiển thị hình ảnh từ base64
-                        Image.memory(
-                          bytes,
-                          height: 150,
-                          width: 150,
-                          fit: BoxFit.cover,
-                        ),
-                        SizedBox(height: 10,),
-                        Text(
-                          ds["Name"],
-                          style: AppWidget.semiboldTextFeildStyle(),
-                        ),
-                        Spacer(),
-                        Row(
-                          children: [
-                            Text(
-                              "\$" + ds["Price"],
-                              style: TextStyle(
-                                  color: Color(0xfffd6f3e),
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold),
+                        // Khi nhấn vào hình ảnh sẽ chuyển đến trang chi tiết
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(
+                                builder: (context) => ProductDetail(
+                                  detail: ds["Detail"], 
+                                  image: ds["Image"], 
+                                  name: ds["Name"], 
+                                  price: ds["Price"]
+                                )
+                              )
+                            );
+                          },
+                          child: Container(
+                            height: 150,
+                            width: double.infinity,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                topRight: Radius.circular(10),
+                              ),
+                              child: Image.memory(
+                                bytes,
+                                fit: BoxFit.cover,
+                              ),
                             ),
-                            SizedBox(
-                              width: 30,
-                            ),
-                            GestureDetector(
-                              onTap: (){
-                                Navigator.push(context, MaterialPageRoute(builder: (context)=> ProductDetail(detail: ds["Detail"], image: ds["Image"], name: ds["Name"], price: ds["Price"])));
-                              },
-                              child: Container(
-                                  padding: EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ds["Name"],
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                ds["Detail"],
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "${ds["Price"]}đ",
+                                    style: TextStyle(
                                       color: Color(0xfffd6f3e),
-                                      borderRadius: BorderRadius.circular(7)),
-                                  child: Icon(
-                                    Icons.add,
-                                    color: Colors.white,
-                                  )),
-                            )
-                          ],
-                        )
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      // Thêm sản phẩm vào giỏ hàng
+                                      addToCart(ds["Name"], ds["Price"], ds["Image"], ds["Detail"]);
+                                      
+                                      // Hiển thị thông báo
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text("Đã thêm sản phẩm vào giỏ hàng"),
+                                          backgroundColor: Colors.green,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Color(0xfffd6f3e),
+                                        borderRadius: BorderRadius.circular(7),
+                                      ),
+                                      child: Icon(
+                                        Icons.add,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   );
-                })
-            : Container();
+                },
+              )
+            : Center(child: CircularProgressIndicator());
       },
     );
   }
@@ -112,143 +200,16 @@ class _CategoryProductState extends State<CategoryProduct> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xfff2f2f2),
+        title: Text(
+          widget.category,
+          style: AppWidget.boldTextFeildStyle(),
+        ),
       ),
       body: Container(
-        margin: EdgeInsets.only(left: 20, right: 20),
-        child: Container(
-          child: Column(
-            children: [
-              Expanded(child: allProducts()),
-            ],
-          ),
-        ),
+        margin: EdgeInsets.symmetric(horizontal: 10),
+        child: allProducts(),
       ),
     );
   }
 }
 
-
-
-
-
-
-
-
-
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:flutter/material.dart';
-// import 'package:shopping_app/pages/widget/support_widget.dart';
-// import 'package:shopping_app/services/database.dart';
-
-// class CategoryProduct extends StatefulWidget {
-//   String category;
-//   CategoryProduct({required this.category});
-
-//   @override
-//   State<CategoryProduct> createState() => _CategoryProductState();
-// }
-
-// class _CategoryProductState extends State<CategoryProduct> {
-//   Stream? CategoryStream;
-
-//   getontheload()async{
-//     CategoryStream= await DatabaseMethods().getProducts(widget.category);
-//     setState(() {
-      
-//     });
-//   }
-
-//  @override
-//  void initState(){
-//   getontheload();
-//    super.initState();
-//  }
-
-
-//   Widget allProducts() {
-//     return StreamBuilder(
-//         stream: CategoryStream,
-//         builder: (context, AsyncSnapshot snapshot) {
-//           return snapshot.hasData
-//               ? GridView.builder(
-//                   padding: EdgeInsets.zero,
-//                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-//                       crossAxisCount: 2,
-//                       childAspectRatio: 0.6,
-//                       mainAxisSpacing: 10,
-//                       crossAxisSpacing: 10),
-//                   itemCount: snapshot.data.docs.length,
-//                   itemBuilder: (context, index) {
-//                     DocumentSnapshot ds = snapshot.data.docs[index];
-
-//                     return Container(
-//                       margin: EdgeInsets.only(right: 20),
-//                       padding: EdgeInsets.symmetric(horizontal: 20),
-//                       decoration: BoxDecoration(
-//                           color: Colors.white,
-//                           borderRadius: BorderRadius.circular(10)),
-//                       child: Column(
-//                         children: [
-//                           Image.network(
-//                             ds["Image"],
-//                             height: 150,
-//                             width: 150,
-//                             fit: BoxFit.cover,
-//                           ),
-//                           Text(
-//                             ds["Name"],
-//                             style: AppWidget.semiboldTextFeildStyle(),
-//                           ),
-//                           SizedBox(
-//                             height: 10,
-//                           ),
-//                           Row(
-//                             children: [
-//                               Text(
-//                                 "\$"+ds["Price"],
-//                                 style: TextStyle(
-//                                     color: Color(0xfffd6f3e),
-//                                     fontSize: 20,
-//                                     fontWeight: FontWeight.bold),
-//                               ),
-//                               SizedBox(
-//                                 width: 50,
-//                               ),
-//                               Container(
-//                                   padding: EdgeInsets.all(5),
-//                                   decoration: BoxDecoration(
-//                                       color: Color(0xfffd6f3e),
-//                                       borderRadius: BorderRadius.circular(7)),
-//                                   child: Icon(
-//                                     Icons.add,
-//                                     color: Colors.white,
-//                                   ))
-//                             ],
-//                           )
-//                         ],
-//                       ),
-//                     );
-//                   })
-//               : Container();
-//         });
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         backgroundColor: Color(0xfff2f2f2),
-//       ),
-//       body: Container(
-//         child: Container(
-//           child: Column(
-//             children: [
-//               Expanded(child: allProducts()),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

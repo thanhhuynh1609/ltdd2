@@ -2,9 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/category_products.dart';
+import 'package:shopping_app/pages/cart_page.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:shopping_app/services/cart_service.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -122,10 +126,18 @@ class _HomeState extends State<Home> {
                                         fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            Icon(
-                              Icons.shopping_cart_outlined,
-                              color: Colors.white,
-                              size: 30,
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => CartPage()),
+                                );
+                              },
+                              child: Icon(
+                                Icons.shopping_cart_outlined,
+                                color: Colors.white,
+                                size: 30,
+                              ),
                             )
                           ],
                         ),
@@ -216,8 +228,13 @@ class _HomeState extends State<Home> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     width: MediaQuery.of(context).size.width,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)), ),
-
+                    decoration: BoxDecoration(
+                      color: Colors.white, 
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20), 
+                        topRight: Radius.circular(20)
+                      ),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -228,10 +245,257 @@ class _HomeState extends State<Home> {
                             fit: BoxFit.cover,
                           ),
                         ),
-                        SizedBox(
-                          height: 20,
+                        SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Popular Products", 
+                              style: TextStyle(
+                                fontSize: 18, 
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                // Chuyển đến trang tất cả sản phẩm
+                              },
+                              child: Text(
+                                "View all",
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        Text("Popular Products", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),)
+                        SizedBox(height: 15),
+                        StreamBuilder(
+                          stream: FirebaseFirestore.instance.collection("Products").limit(6).snapshots(),
+                          builder: (context, AsyncSnapshot snapshot) {
+                            if (!snapshot.hasData) {
+                              return Center(child: CircularProgressIndicator());
+                            }
+                            
+                            return GridView.builder(
+                              physics: NeverScrollableScrollPhysics(),
+                              shrinkWrap: true,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.75,
+                                mainAxisSpacing: 15,
+                                crossAxisSpacing: 15,
+                              ),
+                              itemCount: snapshot.data.docs.length,
+                              itemBuilder: (context, index) {
+                                DocumentSnapshot ds = snapshot.data.docs[index];
+                                
+                                // Giải mã base64 từ Firestore
+                                String base64Image = ds["Image"];
+                                Uint8List bytes = base64Decode(base64Image);
+                                
+                                // Tạo giá giảm giá ngẫu nhiên cho một số sản phẩm
+                                bool hasDiscount = index % 3 == 0;
+                                String originalPrice = ds["Price"];
+                                String discountPrice = "";
+                                int discountPercent = 0;
+                                
+                                if (hasDiscount) {
+                                  double price = double.parse(originalPrice);
+                                  discountPercent = (10 + (index * 7) % 20); // 10%, 17%, 24%, 31%
+                                  double discountedPrice = price * (1 - discountPercent / 100);
+                                  discountPrice = price.toString();
+                                  originalPrice = discountedPrice.toStringAsFixed(1);
+                                }
+                                
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        spreadRadius: 1,
+                                        blurRadius: 3,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Phần ảnh sản phẩm
+                                      Stack(
+                                        children: [
+                                          Container(
+                                            height: 120,
+                                            width: double.infinity,
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(10),
+                                                topRight: Radius.circular(10),
+                                              ),
+                                              child: Image.memory(
+                                                bytes,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                          
+                                          // Badge giảm giá
+                                          if (hasDiscount)
+                                            Positioned(
+                                              left: 0,
+                                              top: 8,
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber,
+                                                  borderRadius: BorderRadius.only(
+                                                    topRight: Radius.circular(8),
+                                                    bottomRight: Radius.circular(8),
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  "$discountPercent%",
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          
+                                          // Nút yêu thích
+                                          Positioned(
+                                            right: 8,
+                                            top: 8,
+                                            child: Container(
+                                              padding: EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.favorite_border,
+                                                color: Colors.grey,
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      
+                                      // Phần thông tin sản phẩm
+                                      Padding(
+                                        padding: EdgeInsets.all(8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              ds["Name"],
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.star,
+                                                  color: Colors.amber,
+                                                  size: 14,
+                                                ),
+                                                Text(
+                                                  " ${3.5 + (index % 2) * 0.5}",
+                                                  style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(height: 8),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    if (hasDiscount)
+                                                      Text(
+                                                        "\$$discountPrice",
+                                                        style: TextStyle(
+                                                          decoration: TextDecoration.lineThrough,
+                                                          color: Colors.grey,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    Text(
+                                                      "\$${originalPrice}",
+                                                      style: TextStyle(
+                                                        color: Color(0xfffd6f3e),
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () {
+                                                    // Thêm vào giỏ hàng
+                                                    double priceValue = double.tryParse(originalPrice) ?? 0.0;
+                                                    CartItem item = CartItem(
+                                                      brand: ds["Category"] ?? "Brand",
+                                                      name: ds["Name"],
+                                                      color: "",
+                                                      size: "",
+                                                      price: priceValue,
+                                                      quantity: 1,
+                                                      image: ds["Image"],
+                                                      detail: ds["Detail"] ?? "",
+                                                    );
+                                                    CartService.addToCart(item);
+                                                    
+                                                    // Hiển thị thông báo
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text("Đã thêm sản phẩm vào giỏ hàng"),
+                                                        backgroundColor: Colors.green,
+                                                        duration: Duration(seconds: 2),
+                                                      ),
+                                                    );
+                                                  },
+                                                  child: Container(
+                                                    padding: EdgeInsets.all(6),
+                                                    decoration: BoxDecoration(
+                                                      color: Color(0xfffd6f3e),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.add,
+                                                      color: Colors.white,
+                                                      size: 20,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ],
                     ),
                   )
