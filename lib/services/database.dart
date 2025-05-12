@@ -57,16 +57,21 @@ class DatabaseMethods {
         .snapshots();
   }
 
-  // Lấy đơn hàng theo email người dùng
-  Future<Stream<QuerySnapshot>> getOrders(String email) async {
+  // Lấy đơn hàng của người dùng
+  Future<Stream<QuerySnapshot>> getOrders(String userId) async {
     return FirebaseFirestore.instance
         .collection("Orders")
-        .where("Email", isEqualTo: email)
+        .where("UserId", isEqualTo: userId)
         .snapshots();
   }
 
   // Thêm chi tiết đơn hàng
   Future orderDetails(Map<String, dynamic> userInfoMap) async {
+    // Đảm bảo OrderId luôn tồn tại trong userInfoMap
+    if (!userInfoMap.containsKey("OrderId")) {
+      userInfoMap["OrderId"] = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+    
     return await FirebaseFirestore.instance
         .collection("Orders")
         .add(userInfoMap);
@@ -149,5 +154,17 @@ class DatabaseMethods {
         .collection("user")
         .doc(userId)
         .delete();
+  }
+
+  // Tạo đơn hàng mới với cấu trúc gộp sản phẩm
+  Future createOrder(Map<String, dynamic> orderMap) async {
+    // Đảm bảo không có trường CreatedAt trong orderMap
+    if (orderMap.containsKey("CreatedAt")) {
+      orderMap.remove("CreatedAt");
+    }
+    
+    return await FirebaseFirestore.instance
+        .collection("Orders")
+        .add(orderMap);
   }
 }

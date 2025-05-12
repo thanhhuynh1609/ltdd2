@@ -45,4 +45,6 @@ class SharedPreferenceHelper{
     return prefs.getString(userEmailIdkey);
   }
 
+  getUserProfile() {}
+
 }
