@@ -1,173 +1,200 @@
-import 'dart:convert'; // Để sử dụng base64Decode
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
 
 class Order extends StatefulWidget {
-  const Order({super.key});
+  const Order({Key? key}) : super(key: key);
 
   @override
   State<Order> createState() => _OrderState();
 }
 
 class _OrderState extends State<Order> {
-  String? email;
-
-  // Lấy email từ SharedPreferences
-  Future<void> getSharedPref() async {
-    email = await SharedPreferenceHelper().getUserEmail();
-    setState(() {});
-  }
-
+  String? id = "";
   Stream? orderStream;
-
-  // Tải dữ liệu khi khởi tạo
-  Future<void> loadOrders() async {
-    await getSharedPref();
-    if (email != null) {
-      orderStream = await DatabaseMethods().getOrders(email!);
-    }
-    setState(() {});
-  }
 
   @override
   void initState() {
-    loadOrders();
     super.initState();
+    getUserId();
   }
 
-  // Widget hiển thị tất cả các đơn hàng
-  Widget allOrders() {
-    return StreamBuilder(
-      stream: orderStream,
-      builder: (context, AsyncSnapshot snapshot) {
-        if (!snapshot.hasData) {
-          return Center(child: CircularProgressIndicator());
-        }
+  getUserId() async {
+    id = await SharedPreferenceHelper().getUserId();
+    getOrderData();
+  }
 
-        if (snapshot.data.docs.isEmpty) {
-          return Center(
-            child: Text("No orders found", style: AppWidget.semiboldTextFeildStyle()),
-          );
-        }
-
-        return ListView.builder(
-          padding: EdgeInsets.zero,
-          itemCount: snapshot.data.docs.length,
-          itemBuilder: (context, index) {
-            DocumentSnapshot ds = snapshot.data.docs[index];
-
-            // Giải mã base64 từ Firestore
-            String base64Image = ds["ProductImage"];
-            Uint8List? imageBytes;
-
-            try {
-              imageBytes = base64Decode(base64Image);
-            } catch (e) {
-              print("Error decoding base64 image: $e");
-              imageBytes = null;
-            }
-
-            return Container(
-              margin: EdgeInsets.only(bottom: 20),
-              child: Material(
-                elevation: 3,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  width: MediaQuery.of(context).size.width,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Hiển thị ảnh từ base64 hoặc placeholder nếu lỗi
-                          imageBytes != null
-                              ? Image.memory(
-                                  imageBytes,
-                                  height: 120,
-                                  width: 120,
-                                  fit: BoxFit.cover,
-                                )
-                              : Container(
-                                  height: 120,
-                                  width: 120,
-                                  color: Colors.grey[300],
-                                  child: Icon(Icons.image_not_supported),
-                                ),
-                          SizedBox(width: 50),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(height: 20,),
-                                  Text(
-                                    ds["Product"],
-                                    style: AppWidget.semiboldTextFeildStyle(),
-                                  ),
-                                  SizedBox(height: 5),
-                                  Text(
-                                    "\$${ds["Price"]}",
-                                    style: TextStyle(
-                                      color: Color(0xfffd6f3e),
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    "Status: " + ds["Status"],
-                                    style: TextStyle(
-                                      color: Color(0xfffd6f3e),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+  getOrderData() async {
+    orderStream = await DatabaseMethods().getOrders(id!);
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xfff2f2f2),
-        title: Center(
-          child: Text(
-            "Current Orders",
-            style: AppWidget.boldTextFeildStyle(),
-          ),
+        title: Text(
+          "Đơn hàng của tôi",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.black),
+        elevation: 0,
       ),
       body: Container(
-        margin: EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          children: [
-            Expanded(child: allOrders())
-          ],
+        margin: EdgeInsets.symmetric(horizontal: 20.0),
+        child: StreamBuilder(
+          stream: orderStream,
+          builder: (context, AsyncSnapshot snapshot) {
+            return snapshot.hasData
+                ? ListView.builder(
+                    itemCount: snapshot.data.docs.length,
+                    itemBuilder: (context, index) {
+                      DocumentSnapshot ds = snapshot.data.docs[index];
+                      
+                      // Kiểm tra xem trường Status có tồn tại không
+                      String status = ds["Status"] ?? "Đang xử lý";
+                      
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 20.0),
+                        child: Material(
+                          elevation: 5.0,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: 
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Đơn hàng #${ds.id.substring(0, 8)}",
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 10, 
+                                        vertical: 5
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: getStatusColor(status),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 10),
+                                // Hiển thị danh sách sản phẩm
+                                if (ds["Products"] != null)
+                                  ...buildProductList(ds["Products"]),
+                                SizedBox(height: 10),
+                                Divider(),
+                                Row(
+                                  mainAxisAlignment: 
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Tổng tiền:",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      "\$${ds["TotalAmount"] ?? "0"}",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Color(0xfffd6f3e),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : Center(child: CircularProgressIndicator());
+          },
         ),
       ),
     );
+  }
+
+  // Hàm tạo danh sách widget hiển thị sản phẩm
+  List<Widget> buildProductList(List<dynamic> products) {
+    List<Widget> productWidgets = [];
+    
+    for (var product in products) {
+      productWidgets.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.shopping_bag, color: Colors.grey),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product["Name"] ?? "Sản phẩm",
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "${product["Quantity"] ?? 1} x \$${product["Price"] ?? "0"}",
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return productWidgets;
+  }
+
+  // Hàm trả về màu dựa trên trạng thái
+  Color getStatusColor(String status) {
+    switch (status) {
+      case "Đã giao hàng":
+        return Colors.green;
+      case "Đang giao hàng":
+        return Colors.blue;
+      case "Đã hủy":
+        return Colors.red;
+      default:
+        return Color(0xfffd6f3e); // Đang xử lý
+    }
   }
 }
