@@ -158,9 +158,27 @@ class DatabaseMethods {
 
   // Tạo đơn hàng mới với cấu trúc gộp sản phẩm
   Future createOrder(Map<String, dynamic> orderMap) async {
-    // Đảm bảo không có trường CreatedAt trong orderMap
-    if (orderMap.containsKey("CreatedAt")) {
-      orderMap.remove("CreatedAt");
+    // Đảm bảo các trường số được lưu dưới dạng chuỗi
+    if (orderMap.containsKey('TotalAmount') && orderMap['TotalAmount'] is num) {
+      orderMap['TotalAmount'] = orderMap['TotalAmount'].toString();
+    }
+    
+    // Đảm bảo OrderId là chuỗi
+    if (orderMap.containsKey('OrderId') && orderMap['OrderId'] is num) {
+      orderMap['OrderId'] = orderMap['OrderId'].toString();
+    }
+    
+    // Xử lý danh sách sản phẩm
+    if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
+      List products = orderMap['Products'];
+      for (int i = 0; i < products.length; i++) {
+        if (products[i]['Price'] is num) {
+          products[i]['Price'] = products[i]['Price'].toString();
+        }
+        if (products[i]['Quantity'] is num) {
+          products[i]['Quantity'] = products[i]['Quantity'].toString();
+        }
+      }
     }
     
     return await FirebaseFirestore.instance

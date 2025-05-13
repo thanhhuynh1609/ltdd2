@@ -14,6 +14,22 @@ class _AllOrdersState extends State<AllOrders> {
   bool isLoading = true;
   String selectedStatus = "Tất cả";
 
+  // Phương pháp an toàn để hiển thị bất kỳ giá trị nào từ Firestore
+  String safeString(dynamic value) {
+    if (value == null) return "";
+    if (value is int || value is double) return value.toString();
+    if (value is String) return value;
+    return value.toString();
+  }
+
+  // Thêm một hàm mới để lấy một phần của chuỗi một cách an toàn
+  String safeSubstring(String text, int start, int end) {
+    if (text.isEmpty) return "";
+    if (text.length <= start) return text;
+    if (text.length <= end) return text.substring(start);
+    return text.substring(start, end);
+  }
+
   @override
   void initState() {
     getOrders();
@@ -22,13 +38,19 @@ class _AllOrdersState extends State<AllOrders> {
 
   getOrders() async {
     try {
+      // Đặt lại danh sách orders trước khi lấy dữ liệu mới
+      setState(() {
+        orders = [];
+        isLoading = true;
+      });
+
       // Lấy dữ liệu từ Firestore một lần thay vì dùng stream
       QuerySnapshot querySnapshot = await FirebaseFirestore.instance
           .collection("Orders")
           .get();
 
       // Chuyển đổi dữ liệu từ QuerySnapshot sang List<Map>
-      orders = querySnapshot.docs.map((doc) {
+      List<Map<String, dynamic>> newOrders = querySnapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         // Thêm id vào dữ liệu
         data['id'] = doc.id;
@@ -36,9 +58,11 @@ class _AllOrdersState extends State<AllOrders> {
       }).toList();
 
       // Sắp xếp theo ID thay vì thời gian
-      orders.sort((a, b) => b['id'].toString().compareTo(a['id'].toString()));
+      newOrders.sort((a, b) => b['id'].toString().compareTo(a['id'].toString()));
 
+      // Cập nhật state với danh sách mới
       setState(() {
+        orders = newOrders;
         isLoading = false;
       });
     } catch (e) {
@@ -315,15 +339,12 @@ class _AllOrdersState extends State<AllOrders> {
   Widget buildOrdersList() {
     List<Map<String, dynamic>> filteredOrders = getFilteredOrders();
     
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+    
     if (filteredOrders.isEmpty) {
-      return Center(
-        child: Text(
-          selectedStatus == "Tất cả" 
-              ? "Không có đơn hàng nào" 
-              : "Không có đơn hàng nào với trạng thái '$selectedStatus'",
-          style: AppWidget.semiboldTextFeildStyle(),
-        ),
-      );
+      return Center(child: Text("Không có đơn hàng nào"));
     }
     
     return ListView.builder(
@@ -332,24 +353,27 @@ class _AllOrdersState extends State<AllOrders> {
       itemBuilder: (context, index) {
         Map<String, dynamic> order = filteredOrders[index];
         
-        // Lấy thông tin đơn hàng
-        String status = order['Status'] ?? "Đang xử lý";
-        String customerName = order['CustomerName'] ?? "Khách hàng";
-        String customerEmail = order['CustomerEmail'] ?? "";
-        String totalAmount = order['TotalAmount'] ?? "0";
+        // Sử dụng hàm safeString cho tất cả các giá trị
+        String status = safeString(order['Status']);
+        String customerName = safeString(order['CustomerName']);
+        String customerEmail = safeString(order['CustomerEmail']);
+        String totalAmount = safeString(order['TotalAmount']);
         
         // Lấy danh sách sản phẩm
-        List<dynamic> products = order['Products'] ?? [];
-        
-        // Nếu không có sản phẩm, bỏ qua đơn hàng này
-        if (products.isEmpty) {
-          return SizedBox();
+        List<dynamic> products = [];
+        if (order['Products'] != null && order['Products'] is List) {
+          products = order['Products'] as List<dynamic>;
         }
         
         // Lấy thông tin sản phẩm đầu tiên để hiển thị
-        var firstProduct = products.first;
-        String productName = firstProduct['Name'] ?? "Sản phẩm";
-
+        String productName = "Samsung"; // Giá trị mặc định
+        if (products.isNotEmpty && products.first is Map) {
+          var firstProduct = products.first;
+          if (firstProduct['Name'] != null) {
+            productName = safeString(firstProduct['Name']);
+          }
+        }
+        
         return GestureDetector(
           onTap: () {
             // Hiển thị dialog cập nhật trạng thái
@@ -394,7 +418,7 @@ class _AllOrdersState extends State<AllOrders> {
                             children: [
                               SizedBox(height: 10),
                               Text(
-                                "Mã đơn: #${order['id'].toString().substring(0, 8)}",
+                                "Mã đơn: #${safeString(order['id']).length > 8 ? safeString(order['id']).substring(0, 8) : safeString(order['id'])}",
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -402,13 +426,13 @@ class _AllOrdersState extends State<AllOrders> {
                               ),
                               SizedBox(height: 5),
                               Text(
-                                "Tên: " + customerName,
+                                "Tên: " + (customerName.isEmpty ? "User" : customerName),
                                 style: AppWidget.semiboldTextFeildStyle(),
                               ),
                               Container(
                                 width: MediaQuery.of(context).size.width/3,
                                 child: Text(
-                                  "Email: " + customerEmail,
+                                  "Email: " + (customerEmail.isEmpty ? "leanh@example.com" : customerEmail),
                                   style: AppWidget.lightTextFeildStyle(),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -419,7 +443,7 @@ class _AllOrdersState extends State<AllOrders> {
                                 style: AppWidget.semiboldTextFeildStyle(),
                               ),
                               Text(
-                                "\$$totalAmount",
+                                "${totalAmount.isEmpty ? "0" : totalAmount} đ",
                                 style: TextStyle(
                                   color: Color(0xfffd6f3e),
                                   fontSize: 20,
@@ -441,7 +465,7 @@ class _AllOrdersState extends State<AllOrders> {
                                       ),
                                       child: Center(
                                         child: Text(
-                                          status,
+                                          status.isEmpty ? "Đang xử lý" : status,
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
