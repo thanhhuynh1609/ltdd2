@@ -11,6 +11,7 @@ import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/cart_service.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
+import 'package:shopping_app/pages/product_reviews.dart';
 
 class ProductDetail extends StatefulWidget {
   String image, name, detail, price;
@@ -47,7 +48,7 @@ class _ProductDetailState extends State<ProductDetail> {
   Widget build(BuildContext context) {
     // Giải mã base64 từ chuỗi
     Uint8List imageBytes = base64Decode(widget.image);
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -81,7 +82,7 @@ class _ProductDetailState extends State<ProductDetail> {
                   fit: BoxFit.contain,
                 ),
               ),
-              
+
               // Phần thumbnail ảnh
               Container(
                 height: 80,
@@ -122,9 +123,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   ],
                 ),
               ),
-              
+
               SizedBox(height: 16),
-              
+
               // Đánh giá và chia sẻ
               Row(
                 children: [
@@ -144,9 +145,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   Icon(Icons.share, color: Colors.grey.shade700),
                 ],
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Giá và giảm giá
               Row(
                 children: [
@@ -174,9 +175,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   ),
                 ],
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Tên sản phẩm
               Text(
                 widget.name,
@@ -185,9 +186,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Tình trạng kho
               Row(
                 children: [
@@ -207,9 +208,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   ),
                 ],
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Thương hiệu
               Row(
                 children: [
@@ -226,9 +227,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   Icon(Icons.verified, size: 14, color: Colors.blue),
                 ],
               ),
-              
+
               SizedBox(height: 15),
-              
+
               // Phần variation
               Container(
                 padding: EdgeInsets.all(16),
@@ -266,9 +267,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   ],
                 ),
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Phần chọn màu
               Text(
                 "Color",
@@ -277,9 +278,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   fontSize: 16,
                 ),
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Các màu sắc
               Row(
                 children: [
@@ -288,9 +289,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   buildColorOption(Colors.red, false),
                 ],
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Phần chọn kích thước
               Text(
                 "Size",
@@ -299,9 +300,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   fontSize: 16,
                 ),
               ),
-              
+
               SizedBox(height: 10),
-              
+
               // Các kích thước
               Row(
                 children: [
@@ -312,9 +313,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   buildSizeOption("EU 34", true),
                 ],
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Nút thanh toán
               ElevatedButton(
                 onPressed: () {
@@ -330,7 +331,7 @@ class _ProductDetailState extends State<ProductDetail> {
                     image: widget.image,
                     detail: widget.detail,
                   );
-                  
+
                   // Chuyển đến trang thanh toán với chỉ sản phẩm này
                   Navigator.push(
                     context,
@@ -357,9 +358,9 @@ class _ProductDetailState extends State<ProductDetail> {
                   ),
                 ),
               ),
-              
+
               SizedBox(height: 20),
-              
+
               // Phần mô tả
               Text(
                 "Description",
@@ -368,41 +369,181 @@ class _ProductDetailState extends State<ProductDetail> {
                   fontSize: 16,
                 ),
               ),
-              
+
               SizedBox(height: 8),
-              
+
               Text(
-                widget.detail.isNotEmpty 
-                    ? widget.detail 
+                widget.detail.isNotEmpty
+                    ? widget.detail
                     : "Nike Air Jordan Shoes for running. Quality product. Long Lasting.",
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade700,
                 ),
               ),
-              
+
               SizedBox(height: 16),
-              
+
               // Phần đánh giá
               Divider(height: 1, color: Colors.grey.shade300),
-              
+
               Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Text(
-                      "Reviews (199)",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                    // Phần hiển thị đánh giá và nút xem tất cả
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProductReviews(
+                              productId: widget.name,
+                              productName: widget.name,
+                              productImage: widget.image,
+                            ),
+                          ),
+                        ).then((_) {
+                          // Refresh khi quay lại
+                          setState(() {});
+                        });
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          FutureBuilder<QuerySnapshot>(
+                              future: FirebaseFirestore.instance
+                                  .collection("Reviews")
+                                  .where("ProductId", isEqualTo: widget.name)
+                                  .get(),
+                              builder: (context, snapshot) {
+                                int reviewCount = 0;
+                                double averageRating = 0;
+
+                                if (snapshot.hasData &&
+                                    snapshot.data!.docs.isNotEmpty) {
+                                  reviewCount = snapshot.data!.docs.length;
+                                  double total = 0;
+                                  for (var doc in snapshot.data!.docs) {
+                                    Map<String, dynamic> data =
+                                        doc.data() as Map<String, dynamic>;
+                                    total += (data["Rating"] ?? 5).toDouble();
+                                  }
+                                  averageRating = total / reviewCount;
+                                }
+
+                                return Row(
+                                  children: [
+                                    Text(
+                                      "Đánh giá",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Row(
+                                      children: List.generate(5, (index) {
+                                        return Icon(
+                                          index < averageRating.floor()
+                                              ? Icons.star
+                                              : (index < averageRating.ceil() &&
+                                                      index >=
+                                                          averageRating.floor())
+                                                  ? Icons.star_half
+                                                  : Icons.star_border,
+                                          color: Colors.amber,
+                                          size: 16,
+                                        );
+                                      }),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "($reviewCount)",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                          Icon(Icons.arrow_forward_ios, size: 16),
+                        ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_ios, size: 16),
+
+                    // Nút đánh giá sản phẩm - Chỉ hiển thị cho người dùng đã mua sản phẩm
+                    SizedBox(height: 12),
+                    if (FirebaseAuth.instance.currentUser != null)
+                      FutureBuilder<bool>(
+                        future: DatabaseMethods().hasUserPurchasedProduct(
+                            FirebaseAuth.instance.currentUser!.email!,
+                            widget.name),
+                        builder: (context, snapshot) {
+                          // Hiển thị trạng thái loading
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Center(
+                                child: SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            );
+                          }
+
+                          bool canReview = snapshot.data ?? false;
+
+                          if (!canReview) {
+                            return Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.info_outline,
+                                      size: 16, color: Colors.grey),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "Bạn cần mua sản phẩm này để đánh giá",
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                _showRatingDialog();
+                              },
+                              icon: Icon(Icons.rate_review),
+                              label: Text("Đánh giá sản phẩm"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber,
+                                foregroundColor: Colors.black,
+                                minimumSize: Size(double.infinity, 40),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
-              
+
               SizedBox(height: 80), // Thêm khoảng trống cho bottom bar
             ],
           ),
@@ -442,7 +583,7 @@ class _ProductDetailState extends State<ProductDetail> {
                     padding: EdgeInsets.zero,
                     constraints: BoxConstraints(minWidth: 30, minHeight: 30),
                   ),
-                  
+
                   // Hiển thị số lượng
                   Container(
                     width: 30,
@@ -454,7 +595,7 @@ class _ProductDetailState extends State<ProductDetail> {
                       ),
                     ),
                   ),
-                  
+
                   // Nút tăng
                   IconButton(
                     icon: Icon(Icons.add, size: 18),
@@ -469,9 +610,9 @@ class _ProductDetailState extends State<ProductDetail> {
                 ],
               ),
             ),
-            
+
             SizedBox(width: 16),
-            
+
             // Nút thêm vào giỏ hàng
             Expanded(
               child: ElevatedButton.icon(
@@ -489,7 +630,7 @@ class _ProductDetailState extends State<ProductDetail> {
                     detail: widget.detail,
                   );
                   CartService.addToCart(item);
-                  
+
                   // Gọi phương thức addToCart với context
                   addToCart(widget, context);
                 },
@@ -525,7 +666,7 @@ class _ProductDetailState extends State<ProductDetail> {
           width: 2,
         ),
       ),
-      child: isSelected 
+      child: isSelected
           ? Center(
               child: Icon(
                 Icons.check,
@@ -557,6 +698,209 @@ class _ProductDetailState extends State<ProductDetail> {
       ),
     );
   }
+
+  // Thêm biến và hàm hiển thị dialog đánh giá
+  void _showRatingDialog() {
+    int rating = 5;
+    final TextEditingController reviewController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Đánh giá sản phẩm"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Hiển thị hình ảnh và tên sản phẩm
+                    Container(
+                      height: 100,
+                      width: double.infinity,
+                      margin: EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          // Hình ảnh sản phẩm
+                          ClipRRect(
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(8),
+                              bottomLeft: Radius.circular(8),
+                            ),
+                            child: Image.memory(
+                              base64Decode(widget.image),
+                              width: 80,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          // Tên sản phẩm
+                          Expanded(
+                            child: Text(
+                              widget.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Divider(),
+                    SizedBox(height: 8),
+
+                    // Chọn số sao
+                    Text(
+                      "Chọn số sao:",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 36,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              rating = index + 1;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                    SizedBox(height: 20),
+
+                    // Nhập đánh giá
+                    Text(
+                      "Nhập đánh giá của bạn:",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: reviewController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText:
+                            "Chia sẻ trải nghiệm của bạn về sản phẩm này...",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: EdgeInsets.all(12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Hủy"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (reviewController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text("Vui lòng nhập nội dung đánh giá"),
+                        backgroundColor: Colors.red,
+                      ));
+                      return;
+                    }
+
+                    Navigator.pop(context);
+
+                    try {
+                      // Kiểm tra xem người dùng đã đăng nhập chưa
+                      if (FirebaseAuth.instance.currentUser == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content:
+                              Text("Vui lòng đăng nhập để đánh giá sản phẩm"),
+                          backgroundColor: Colors.red,
+                        ));
+                        return;
+                      }
+
+                      // Kiểm tra xem người dùng đã mua sản phẩm chưa
+                      bool hasPurchased = await DatabaseMethods()
+                          .hasUserPurchasedProduct(
+                              FirebaseAuth.instance.currentUser!.email!,
+                              widget.name);
+
+                      if (!hasPurchased) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              "Bạn cần mua sản phẩm này trước khi đánh giá"),
+                          backgroundColor: Colors.orange,
+                        ));
+                        return;
+                      }
+
+                      String? userEmail =
+                          FirebaseAuth.instance.currentUser!.email;
+                      String? userName =
+                          await SharedPreferenceHelper().getUserName();
+                      String? userImage =
+                          await SharedPreferenceHelper().getUserProfile();
+
+                      // Đảm bảo có đủ thông tin người dùng
+                      if (userName == null || userName.isEmpty) {
+                        userName = "Người dùng";
+                      }
+
+                      Map<String, dynamic> reviewData = {
+                        "ProductId": widget.name,
+                        "UserEmail": userEmail,
+                        "UserName": userName,
+                        "UserImage": userImage ?? "",
+                        "Rating": rating,
+                        "Review": reviewController.text.trim(),
+                        "Timestamp": FieldValue.serverTimestamp(),
+                      };
+
+                      // Gọi phương thức addProductReview từ DatabaseMethods
+                      await DatabaseMethods().addProductReview(reviewData);
+
+                      // Hiển thị thông báo thành công
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content:
+                            Text("Đánh giá của bạn đã được gửi thành công"),
+                        backgroundColor: Colors.green,
+                      ));
+
+                      // Refresh để hiển thị đánh giá mới
+                      setState(() {});
+                    } catch (e) {
+                      print("Lỗi khi thêm đánh giá: $e");
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text("Lỗi khi gửi đánh giá: $e"),
+                        backgroundColor: Colors.red,
+                      ));
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                  ),
+                  child: Text("Gửi đánh giá"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // Khi thêm sản phẩm vào giỏ hàng, lưu cả ProductImage
@@ -575,7 +919,7 @@ Future<void> addToCart(dynamic widget, BuildContext context) async {
     String? userEmail = FirebaseAuth.instance.currentUser!.email;
     String? userName = await SharedPreferenceHelper().getUserName();
     String? userImage = await SharedPreferenceHelper().getUserProfile();
-    
+
     // Lấy thông tin sản phẩm
     Map<String, dynamic> productData = {
       "Email": userEmail,
@@ -586,10 +930,10 @@ Future<void> addToCart(dynamic widget, BuildContext context) async {
       "ProductImage": widget.image,
       "Status": "Processing"
     };
-    
+
     // Thêm vào giỏ hàng
     await DatabaseMethods().addToCart(productData);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("Đã thêm vào giỏ hàng"),

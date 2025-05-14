@@ -5,7 +5,8 @@ class DatabaseMethods {
   // Thêm thông tin người dùng vào Firestore
   Future addUserDetails(Map<String, dynamic> userInfoMap, String id) async {
     return await FirebaseFirestore.instance
-        .collection("user") // Lưu ý: Tên collection là "user" (không phải "users")
+        .collection(
+            "user") // Lưu ý: Tên collection là "user" (không phải "users")
         .doc(id)
         .set(userInfoMap);
   }
@@ -30,7 +31,8 @@ class DatabaseMethods {
   }
 
   // Thêm sản phẩm vào collection theo danh mục và trả về ID của document
-  Future<String> addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
+  Future<String> addProduct(
+      Map<String, dynamic> userInfoMap, String categoryname) async {
     DocumentReference docRef = await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
@@ -38,7 +40,8 @@ class DatabaseMethods {
   }
 
   // Cập nhật trạng thái đơn hàng
-  Future<void> updateStatus(String id) async { // Đã sửa tên hàm thành "updateStatus" (viết thường chữ "u")
+  Future<void> updateStatus(String id) async {
+    // Đã sửa tên hàm thành "updateStatus" (viết thường chữ "u")
     return await FirebaseFirestore.instance
         .collection("Orders")
         .doc(id)
@@ -72,17 +75,18 @@ class DatabaseMethods {
     if (!userInfoMap.containsKey("OrderId")) {
       userInfoMap["OrderId"] = DateTime.now().millisecondsSinceEpoch.toString();
     }
-    
+
     // Đảm bảo trường Status tồn tại
     if (!userInfoMap.containsKey("Status")) {
-      userInfoMap["Status"] = "Processing"; // hoặc "Đang xử lý" tùy theo ngôn ngữ ứng dụng
+      userInfoMap["Status"] =
+          "Processing"; // hoặc "Đang xử lý" tùy theo ngôn ngữ ứng dụng
     }
-    
+
     // Đảm bảo trường OrderDate tồn tại
     if (!userInfoMap.containsKey("OrderDate")) {
       userInfoMap["OrderDate"] = Timestamp.now();
     }
-    
+
     return await FirebaseFirestore.instance
         .collection("Orders")
         .add(userInfoMap);
@@ -92,8 +96,7 @@ class DatabaseMethods {
   Future<QuerySnapshot> search(String updatename) async {
     return await FirebaseFirestore.instance
         .collection("Products")
-        .where("SearchKey",
-            isEqualTo: updatename.substring(0, 1).toUpperCase())
+        .where("SearchKey", isEqualTo: updatename.substring(0, 1).toUpperCase())
         .get();
   }
 
@@ -103,7 +106,8 @@ class DatabaseMethods {
   }
 
   // Cập nhật sản phẩm
-  Future updateProduct(String productId, Map<String, dynamic> updateInfo) async {
+  Future updateProduct(
+      String productId, Map<String, dynamic> updateInfo) async {
     return await FirebaseFirestore.instance
         .collection("Products")
         .doc(productId)
@@ -127,14 +131,15 @@ class DatabaseMethods {
   }
 
   // Cập nhật sản phẩm trong collection danh mục
-  Future updateProductInCategory(String productId, String category, Map<String, dynamic> updateInfo) async {
+  Future updateProductInCategory(String productId, String category,
+      Map<String, dynamic> updateInfo) async {
     try {
       // Kiểm tra xem document có tồn tại không
       DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
           .collection(category)
           .doc(productId)
           .get();
-      
+
       if (docSnapshot.exists) {
         // Nếu tồn tại thì cập nhật
         return await FirebaseFirestore.instance
@@ -171,25 +176,26 @@ class DatabaseMethods {
   Future createOrder(Map<String, dynamic> orderMap) async {
     try {
       // Đảm bảo các trường số được lưu dưới dạng chuỗi
-      if (orderMap.containsKey('TotalAmount') && orderMap['TotalAmount'] is num) {
+      if (orderMap.containsKey('TotalAmount') &&
+          orderMap['TotalAmount'] is num) {
         orderMap['TotalAmount'] = orderMap['TotalAmount'].toString();
       }
-      
+
       // Đảm bảo OrderId là chuỗi
       if (orderMap.containsKey('OrderId') && orderMap['OrderId'] is num) {
         orderMap['OrderId'] = orderMap['OrderId'].toString();
       }
-      
+
       // Xử lý danh sách sản phẩm
       if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
         List products = orderMap['Products'];
-        
+
         // Tạo danh sách sản phẩm mới với hình ảnh
         List<Map<String, dynamic>> processedProducts = [];
-        
+
         for (int i = 0; i < products.length; i++) {
           Map<String, dynamic> product = Map<String, dynamic>.from(products[i]);
-          
+
           // Chuyển đổi các trường số thành chuỗi
           if (product['Price'] is num) {
             product['Price'] = product['Price'].toString();
@@ -197,24 +203,24 @@ class DatabaseMethods {
           if (product['Quantity'] is num) {
             product['Quantity'] = product['Quantity'].toString();
           }
-          
+
           // Đảm bảo hình ảnh được lưu trữ trong trường ProductImage
-          if (!product.containsKey('ProductImage') && 
-              product.containsKey('Image') && 
+          if (!product.containsKey('ProductImage') &&
+              product.containsKey('Image') &&
               product['Image'] != null) {
             product['ProductImage'] = product['Image'];
           }
-          
+
           processedProducts.add(product);
         }
-        
+
         // Cập nhật danh sách sản phẩm trong orderMap
         orderMap['Products'] = processedProducts;
       }
-      
+
       // Thêm timestamp
       orderMap['CreatedAt'] = FieldValue.serverTimestamp();
-      
+
       // Lưu đơn hàng vào Firestore
       return await FirebaseFirestore.instance
           .collection("Orders")
@@ -232,7 +238,7 @@ class DatabaseMethods {
       if (!productData.containsKey("OrderDate")) {
         productData["OrderDate"] = Timestamp.now();
       }
-      
+
       // Thêm vào collection "Cart"
       return await FirebaseFirestore.instance
           .collection("Cart")
@@ -265,13 +271,128 @@ class DatabaseMethods {
         .collection("Cart")
         .where("Email", isEqualTo: userEmail)
         .get();
-        
+
     WriteBatch batch = FirebaseFirestore.instance.batch();
-    
+
     for (var doc in cartItems.docs) {
       batch.delete(doc.reference);
     }
-    
+
     return await batch.commit();
+  }
+
+  // Kiểm tra người dùng đã mua sản phẩm chưa
+  Future<bool> hasUserPurchasedProduct(
+      String userEmail, String productId) async {
+    try {
+      print("Kiểm tra mua hàng - Email: $userEmail, ProductId: $productId");
+
+      // Chỉ kiểm tra trong collection "Orders" (viết hoa)
+      QuerySnapshot ordersSnapshot = await FirebaseFirestore.instance
+          .collection("Orders")
+          .where("Email", isEqualTo: userEmail)
+          .get();
+
+      // Kiểm tra thêm với trường CustomerEmail
+      QuerySnapshot customerOrdersSnapshot = await FirebaseFirestore.instance
+          .collection("Orders")
+          .where("CustomerEmail", isEqualTo: userEmail)
+          .get();
+
+      // Kết hợp kết quả
+      List<QueryDocumentSnapshot> allDocs = [
+        ...ordersSnapshot.docs,
+        ...customerOrdersSnapshot.docs
+      ];
+
+      print("Tìm thấy ${allDocs.length} đơn hàng");
+
+      for (var doc in allDocs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        print("Kiểm tra đơn hàng ID: ${doc.id}");
+
+        // Kiểm tra trường Product trực tiếp trong đơn hàng
+        if (data.containsKey("Product") && data["Product"] == productId) {
+          print("Tìm thấy sản phẩm trong trường Product");
+          return true;
+        }
+
+        // Kiểm tra trong danh sách sản phẩm của đơn hàng
+        if (data.containsKey("Products") && data["Products"] is List) {
+          List<dynamic> products = data["Products"] as List<dynamic>;
+          print("Đơn hàng có ${products.length} sản phẩm");
+
+          for (var product in products) {
+            if (product is Map<String, dynamic>) {
+              // In ra tên sản phẩm để debug
+              print(
+                  "Kiểm tra sản phẩm: ${product["Name"] ?? product["Product"] ?? "Không có tên"}");
+
+              // Kiểm tra các trường có thể chứa ID sản phẩm
+              if ((product.containsKey("ProductId") &&
+                      product["ProductId"] == productId) ||
+                  (product.containsKey("Product") &&
+                      product["Product"] == productId) ||
+                  (product.containsKey("Name") &&
+                      product["Name"] == productId)) {
+                print("Tìm thấy sản phẩm trong danh sách Products");
+                return true;
+              }
+            }
+          }
+        }
+      }
+
+      print("Không tìm thấy sản phẩm trong lịch sử mua hàng");
+      return false;
+    } catch (e) {
+      print("Lỗi khi kiểm tra lịch sử mua hàng: $e");
+      return false;
+    }
+  }
+
+  // Thêm đánh giá sản phẩm
+  Future<void> addProductReview(Map<String, dynamic> reviewData) async {
+    try {
+      // Đảm bảo có timestamp
+      if (!reviewData.containsKey("Timestamp")) {
+        reviewData["Timestamp"] = FieldValue.serverTimestamp();
+      }
+
+      // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+      String userEmail = reviewData["UserEmail"] ?? "";
+      String productId = reviewData["ProductId"] ?? "";
+
+      if (userEmail.isNotEmpty && productId.isNotEmpty) {
+        // Tìm đánh giá cũ của người dùng cho sản phẩm này
+        QuerySnapshot existingReviews = await FirebaseFirestore.instance
+            .collection("Reviews")
+            .where("UserEmail", isEqualTo: userEmail)
+            .where("ProductId", isEqualTo: productId)
+            .get();
+
+        if (existingReviews.docs.isNotEmpty) {
+          // Nếu đã có đánh giá, cập nhật đánh giá cũ
+          String reviewId = existingReviews.docs.first.id;
+          await FirebaseFirestore.instance
+              .collection("Reviews")
+              .doc(reviewId)
+              .update(reviewData);
+
+          print("Đã cập nhật đánh giá hiện có với ID: $reviewId");
+          return;
+        }
+      }
+
+      // Nếu chưa có đánh giá, thêm mới
+      DocumentReference docRef = await FirebaseFirestore.instance
+          .collection("Reviews")
+          .add(reviewData);
+
+      print("Đã thêm đánh giá mới với ID: ${docRef.id}");
+    } catch (e) {
+      print("Lỗi khi thêm đánh giá: $e");
+      throw e;
+    }
   }
 }
