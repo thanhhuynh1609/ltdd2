@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
+import 'dart:convert';
 
 class Order extends StatefulWidget {
   const Order({Key? key}) : super(key: key);
@@ -143,33 +144,48 @@ class _OrderState extends State<Order> {
     List<Widget> productWidgets = [];
     
     for (var product in products) {
+      // Lấy thông tin sản phẩm
+      String productName = product['Name'] ?? '';
+      String quantity = product['Quantity'] ?? '1';
+      String price = product['Price'] ?? '0';
+      
+      // Lấy hình ảnh sản phẩm
+      String? imageData;
+      if (product['ProductImage'] != null && product['ProductImage'].toString().isNotEmpty) {
+        imageData = product['ProductImage'];
+      } else if (product['Image'] != null && product['Image'].toString().isNotEmpty) {
+        imageData = product['Image'];
+      }
+      
       productWidgets.add(
-        Padding(
-          padding: EdgeInsets.only(bottom: 8),
+        Container(
+          margin: EdgeInsets.only(bottom: 10),
           child: Row(
             children: [
+              // Hiển thị hình ảnh sản phẩm
               Container(
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
                   borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[200],
                 ),
-                child: Icon(Icons.shopping_bag, color: Colors.grey),
+                child: imageData != null && imageData.isNotEmpty
+                  ? _buildProductImage(imageData)
+                  : Icon(Icons.image_not_supported, color: Colors.grey),
               ),
               SizedBox(width: 10),
+              // Thông tin sản phẩm
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product["Name"] ?? "Sản phẩm",
+                      productName,
                       style: TextStyle(fontWeight: FontWeight.w500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      "${product["Quantity"] ?? 1} x \$${product["Price"] ?? "0"}",
+                      "$quantity x \$$price",
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ],
@@ -182,6 +198,45 @@ class _OrderState extends State<Order> {
     }
     
     return productWidgets;
+  }
+
+  // Hàm hiển thị hình ảnh sản phẩm
+  Widget _buildProductImage(String imageData) {
+    try {
+      // Kiểm tra xem imageData có phải là URL không
+      if (imageData.startsWith('http')) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            imageData,
+            fit: BoxFit.cover,
+            width: 50,
+            height: 50,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(Icons.image_not_supported, color: Colors.grey);
+            },
+          ),
+        );
+      } else {
+        // Giả định imageData là chuỗi base64
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(
+            base64Decode(imageData),
+            fit: BoxFit.cover,
+            width: 50,
+            height: 50,
+            errorBuilder: (context, error, stackTrace) {
+              print("Lỗi hiển thị ảnh: $error");
+              return Icon(Icons.image_not_supported, color: Colors.grey);
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      print("Lỗi xử lý ảnh: $e");
+      return Icon(Icons.image_not_supported, color: Colors.grey);
+    }
   }
 
   // Hàm trả về màu dựa trên trạng thái

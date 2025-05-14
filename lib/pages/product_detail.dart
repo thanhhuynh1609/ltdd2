@@ -1,9 +1,12 @@
 import 'dart:convert'; // Để sử dụng base64Decode
 import 'dart:typed_data'; // Để sử dụng Uint8List
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/cart_page.dart';
 import 'package:shopping_app/pages/checkout_page.dart';
+import 'package:shopping_app/pages/login.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/cart_service.dart';
 import 'package:shopping_app/services/database.dart';
@@ -487,14 +490,8 @@ class _ProductDetailState extends State<ProductDetail> {
                   );
                   CartService.addToCart(item);
                   
-                  // Hiển thị thông báo
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Đã thêm sản phẩm vào giỏ hàng"),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  // Gọi phương thức addToCart với context
+                  addToCart(widget, context);
                 },
                 icon: Icon(Icons.shopping_bag_outlined, color: Colors.white),
                 label: Text(
@@ -562,3 +559,50 @@ class _ProductDetailState extends State<ProductDetail> {
   }
 }
 
+// Khi thêm sản phẩm vào giỏ hàng, lưu cả ProductImage
+Future<void> addToCart(dynamic widget, BuildContext context) async {
+  if (FirebaseAuth.instance.currentUser == null) {
+    // Chuyển hướng đến trang đăng nhập
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => Login()),
+    );
+    return;
+  }
+
+  try {
+    // Lấy thông tin người dùng
+    String? userEmail = FirebaseAuth.instance.currentUser!.email;
+    String? userName = await SharedPreferenceHelper().getUserName();
+    String? userImage = await SharedPreferenceHelper().getUserProfile();
+    
+    // Lấy thông tin sản phẩm
+    Map<String, dynamic> productData = {
+      "Email": userEmail,
+      "Image": userImage ?? "",
+      "Name": userName ?? "",
+      "Price": widget.price,
+      "Product": widget.name,
+      "ProductImage": widget.image,
+      "Status": "Processing"
+    };
+    
+    // Thêm vào giỏ hàng
+    await DatabaseMethods().addToCart(productData);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Đã thêm vào giỏ hàng"),
+        backgroundColor: Colors.green,
+      ),
+    );
+  } catch (e) {
+    print("Lỗi khi thêm vào giỏ hàng: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Lỗi: Không thể thêm vào giỏ hàng"),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}

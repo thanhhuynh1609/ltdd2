@@ -29,15 +29,16 @@ class DatabaseMethods {
         .add(userInfoMap);
   }
 
-  // Thêm sản phẩm vào collection theo danh mục
-  Future addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
-    return await FirebaseFirestore.instance
+  // Thêm sản phẩm vào collection theo danh mục và trả về ID của document
+  Future<String> addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
+    DocumentReference docRef = await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
+    return docRef.id;
   }
 
   // Cập nhật trạng thái đơn hàng
-  UpdateStatus(String id) async { // Sửa tên hàm thành "updateStatus" (viết thường chữ "u")
+  Future<void> updateStatus(String id) async { // Đã sửa tên hàm thành "updateStatus" (viết thường chữ "u")
     return await FirebaseFirestore.instance
         .collection("Orders")
         .doc(id)
@@ -70,6 +71,16 @@ class DatabaseMethods {
     // Đảm bảo OrderId luôn tồn tại trong userInfoMap
     if (!userInfoMap.containsKey("OrderId")) {
       userInfoMap["OrderId"] = DateTime.now().millisecondsSinceEpoch.toString();
+    }
+    
+    // Đảm bảo trường Status tồn tại
+    if (!userInfoMap.containsKey("Status")) {
+      userInfoMap["Status"] = "Processing"; // hoặc "Đang xử lý" tùy theo ngôn ngữ ứng dụng
+    }
+    
+    // Đảm bảo trường OrderDate tồn tại
+    if (!userInfoMap.containsKey("OrderDate")) {
+      userInfoMap["OrderDate"] = Timestamp.now();
     }
     
     return await FirebaseFirestore.instance
@@ -173,8 +184,8 @@ class DatabaseMethods {
       if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
         List products = orderMap['Products'];
         
-        // Tạo danh sách sản phẩm mới không chứa hình ảnh base64
-        List<Map<String, dynamic>> optimizedProducts = [];
+        // Tạo danh sách sản phẩm mới với hình ảnh
+        List<Map<String, dynamic>> processedProducts = [];
         
         for (int i = 0; i < products.length; i++) {
           Map<String, dynamic> product = Map<String, dynamic>.from(products[i]);
@@ -187,20 +198,18 @@ class DatabaseMethods {
             product['Quantity'] = product['Quantity'].toString();
           }
           
-          // Loại bỏ hình ảnh base64 từ sản phẩm
-          if (product.containsKey('ProductImage')) { // Đổi từ "Image" thành "ProductImage"
-            // Lưu tham chiếu đến hình ảnh thay vì base64
-            String productName = product['Name'] ?? '';
-            String brand = product['Brand'] ?? '';
-            product['ImageRef'] = "products/${brand}_${productName.replaceAll(' ', '_')}";
-            product.remove('ProductImage');
+          // Đảm bảo hình ảnh được lưu trữ trong trường ProductImage
+          if (!product.containsKey('ProductImage') && 
+              product.containsKey('Image') && 
+              product['Image'] != null) {
+            product['ProductImage'] = product['Image'];
           }
           
-          optimizedProducts.add(product);
+          processedProducts.add(product);
         }
         
         // Cập nhật danh sách sản phẩm trong orderMap
-        orderMap['Products'] = optimizedProducts;
+        orderMap['Products'] = processedProducts;
       }
       
       // Thêm timestamp
@@ -214,5 +223,55 @@ class DatabaseMethods {
       print("Lỗi khi tạo đơn hàng: $e");
       throw e;
     }
+  }
+
+  // Thêm sản phẩm vào giỏ hàng
+  Future addToCart(Map<String, dynamic> productData) async {
+    try {
+      // Đảm bảo trường OrderDate tồn tại nếu chưa có
+      if (!productData.containsKey("OrderDate")) {
+        productData["OrderDate"] = Timestamp.now();
+      }
+      
+      // Thêm vào collection "Cart"
+      return await FirebaseFirestore.instance
+          .collection("Cart")
+          .add(productData);
+    } catch (e) {
+      print("Lỗi khi thêm vào giỏ hàng: $e");
+      throw e;
+    }
+  }
+
+  // Lấy giỏ hàng của người dùng
+  Future<Stream<QuerySnapshot>> getCart(String userEmail) async {
+    return FirebaseFirestore.instance
+        .collection("Cart")
+        .where("Email", isEqualTo: userEmail)
+        .snapshots();
+  }
+
+  // Xóa sản phẩm khỏi giỏ hàng
+  Future deleteCartItem(String cartItemId) async {
+    return await FirebaseFirestore.instance
+        .collection("Cart")
+        .doc(cartItemId)
+        .delete();
+  }
+
+  // Xóa toàn bộ giỏ hàng của người dùng
+  Future clearCart(String userEmail) async {
+    QuerySnapshot cartItems = await FirebaseFirestore.instance
+        .collection("Cart")
+        .where("Email", isEqualTo: userEmail)
+        .get();
+        
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+    
+    for (var doc in cartItems.docs) {
+      batch.delete(doc.reference);
+    }
+    
+    return await batch.commit();
   }
 }

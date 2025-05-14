@@ -220,7 +220,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               Uint8List? imageBytes;
               try {
                 if (base64Image.isNotEmpty) {
-                  imageBytes = base64Decode(base64Image);
+                  if (base64Image.startsWith('http')) {
+                    // Xử lý URL hình ảnh
+                  } else {
+                    // Xử lý base64
+                    imageBytes = base64Decode(base64Image);
+                  }
                 }
               } catch (e) {
                 print("Error decoding base64 image: $e");
@@ -240,15 +245,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                           borderRadius: BorderRadius.circular(8),
                           color: Colors.grey[200],
                         ),
-                        child: imageBytes != null
+                        child: base64Image.startsWith('http')
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.memory(
-                                imageBytes,
+                              child: Image.network(
+                                base64Image,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(Icons.image_not_supported, color: Colors.grey);
+                                },
                               ),
                             )
-                          : Icon(Icons.image_not_supported, color: Colors.grey),
+                          : imageBytes != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.memory(
+                                  imageBytes,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
                       SizedBox(width: 16),
                       
@@ -597,6 +613,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   
   DateFormat(String s) {}
 }
+
+
 
 
 

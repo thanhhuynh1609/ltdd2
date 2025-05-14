@@ -104,26 +104,30 @@ class _EditProductState extends State<EditProduct> {
       // Nếu thay đổi danh mục
       if (widget.productData["Category"] != selectedCategory) {
         // Xóa từ danh mục cũ
-        if (widget.productData["Category"] != null) {
-          await DatabaseMethods().deleteProductFromCategory(
-            widget.productId, 
-            widget.productData["Category"]
-          );
+        if (widget.productData["Category"] != null && widget.productData["CategoryDocId"] != null) {
+          await FirebaseFirestore.instance
+            .collection(widget.productData["Category"])
+            .doc(widget.productData["CategoryDocId"])
+            .delete();
         }
         
         // Thêm vào danh mục mới
-        await DatabaseMethods().addProduct(productData, selectedCategory);
+        String newCategoryDocId = await DatabaseMethods().addProduct(productData, selectedCategory);
+        
+        // Cập nhật ID mới trong Products
+        productData["CategoryDocId"] = newCategoryDocId;
+        await DatabaseMethods().updateProduct(widget.productId, {"CategoryDocId": newCategoryDocId});
       } else {
         // Cập nhật trong cùng danh mục
-        try {
-          await DatabaseMethods().updateProductInCategory(
-            widget.productId,
-            selectedCategory,
-            productData
-          );
-        } catch (e) {
-          print("Lỗi khi cập nhật sản phẩm: $e");
-          // Xử lý lỗi nếu cần
+        if (widget.productData["CategoryDocId"] != null) {
+          await FirebaseFirestore.instance
+            .collection(selectedCategory)
+            .doc(widget.productData["CategoryDocId"])
+            .update(productData);
+        } else {
+          // Nếu không có CategoryDocId, thêm mới và cập nhật ID
+          String newCategoryDocId = await DatabaseMethods().addProduct(productData, selectedCategory);
+          await DatabaseMethods().updateProduct(widget.productId, {"CategoryDocId": newCategoryDocId});
         }
       }
 
@@ -274,5 +278,6 @@ class _EditProductState extends State<EditProduct> {
     }
   }
 }
+
 
 

@@ -39,36 +39,57 @@ class _AllOrdersState extends State<AllOrders> {
   }
 
   getOrders() async {
+    setState(() {
+      isLoading = true;
+    });
+    
     try {
-      // Đặt lại danh sách orders trước khi lấy dữ liệu mới
-      setState(() {
-        orders = [];
-        isLoading = true;
-      });
-
-      // Lấy dữ liệu từ Firestore một lần thay vì dùng stream
       QuerySnapshot querySnapshot = await FirebaseFirestore.instance
           .collection("Orders")
+          .orderBy("CreatedAt", descending: true)
           .get();
-
-      // Chuyển đổi dữ liệu từ QuerySnapshot sang List<Map>
-      List<Map<String, dynamic>> newOrders = querySnapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        // Thêm id vào dữ liệu
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-
-      // Sắp xếp theo ID thay vì thời gian
-      newOrders.sort((a, b) => b['id'].toString().compareTo(a['id'].toString()));
-
-      // Cập nhật state với danh sách mới
+      
+      orders = [];
+      
+      for (var doc in querySnapshot.docs) {
+        Map<String, dynamic> orderData = doc.data() as Map<String, dynamic>;
+        
+        // Thêm ID của document
+        orderData['id'] = doc.id;
+        
+        // Xử lý danh sách sản phẩm để đảm bảo có trường ProductImage
+        if (orderData.containsKey('Products') && orderData['Products'] is List) {
+          List<dynamic> products = orderData['Products'];
+          List<Map<String, dynamic>> updatedProducts = [];
+          
+          for (var product in products) {
+            if (product is Map<String, dynamic>) {
+              // Tạo bản sao để tránh thay đổi dữ liệu gốc
+              Map<String, dynamic> updatedProduct = Map<String, dynamic>.from(product);
+              
+              // Đảm bảo có trường ProductImage
+              if (!updatedProduct.containsKey('ProductImage') && 
+                  updatedProduct.containsKey('Image') && 
+                  updatedProduct['Image'] != null) {
+                updatedProduct['ProductImage'] = updatedProduct['Image'];
+              }
+              
+              updatedProducts.add(updatedProduct);
+            }
+          }
+          
+          // Cập nhật lại danh sách sản phẩm
+          orderData['Products'] = updatedProducts;
+        }
+        
+        orders.add(orderData);
+      }
+      
       setState(() {
-        orders = newOrders;
         isLoading = false;
       });
     } catch (e) {
-      print("Error fetching orders: $e");
+      print("Lỗi khi lấy danh sách đơn hàng: $e");
       setState(() {
         isLoading = false;
       });
@@ -85,198 +106,83 @@ class _AllOrdersState extends State<AllOrders> {
   }
 
   void showStatusUpdateDialog(Map<String, dynamic> order) {
-    String currentStatus = order['Status'] ?? "Đang xử lý";
-    String selectedStatus = currentStatus;
-    
-    // Lấy danh sách sản phẩm
-    List<dynamic> products = [];
-    if (order['Products'] != null && order['Products'] is List) {
-      products = order['Products'] as List<dynamic>;
-    }
+    String selectedStatus = order['Status'] ?? 'Đang xử lý';
     
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text("Chi tiết đơn hàng"),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Mã đơn hàng
-                    Text(
-                      "Mã đơn: #${safeString(order['id']).length > 8 ? safeString(order['id']).substring(0, 8) : safeString(order['id'])}",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 10),
-                    
-                    // Thông tin khách hàng
-                    Text("Khách hàng: ${safeString(order['CustomerName'])}"),
-                    Text("Email: ${safeString(order['CustomerEmail'])}"),
-                    Text("Địa chỉ: ${safeString(order['ShippingAddress'])}"),
-                    Text("SĐT: ${safeString(order['PhoneNumber'])}"),
-                    
-                    SizedBox(height: 15),
-                    Divider(),
-                    
-                    // Danh sách sản phẩm
-                    Text(
-                      "Sản phẩm:",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 10),
-                    
-                    ...products.map((product) {
-                      String productName = safeString(product['Name']);
-                      String productPrice = safeString(product['Price']);
-                      String productQuantity = safeString(product['Quantity']);
-                      
-                      return Container(
-                        margin: EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            // Icon sản phẩm
-                            Container(
-                              height: 30,
-                              width: 30,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Icon(
-                                Icons.shopping_bag,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            // Thông tin sản phẩm
-                            Expanded(
-                              child: Text(
-                                "$productName - $productQuantity x \$${productPrice}",
-                                style: TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    
-                    Divider(),
-                    SizedBox(height: 10),
-                    
-                    // Tổng tiền
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Tổng tiền:",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "\$${safeString(order['TotalAmount'])}",
-                          style: TextStyle(
-                            color: Color(0xfffd6f3e),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Cập nhật trạng thái
-                    Text("Cập nhật trạng thái:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(height: 10),
-                    DropdownButton<String>(
-                      value: selectedStatus,
-                      isExpanded: true,
-                      items: [
-                        "Đang xử lý",
-                        "Đang giao hàng",
-                        "Đã giao hàng",
-                        "Đã hủy"
-                      ].map((status) {
-                        return DropdownMenuItem<String>(
-                          value: status,
-                          child: Text(status),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedStatus = value;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
+        return AlertDialog(
+          title: Text("Cập nhật trạng thái đơn hàng"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Chọn trạng thái mới:"),
+              SizedBox(height: 16),
+              DropdownButton<String>(
+                value: selectedStatus,
+                isExpanded: true,
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    selectedStatus = newValue;
+                  }
+                },
+                items: [
+                  "Đang xử lý",
+                  "Đang vận chuyển",
+                  "Đã giao hàng",
+                  "Đã hủy",
+                ].map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
               ),
-              actions: [
-                // Nút xóa đơn hàng
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    deleteOrder(order['id']);
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
-                  ),
-                  child: Text("Xóa đơn hàng"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text("Hủy"),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      // Cập nhật trạng thái đơn hàng
-                      await FirebaseFirestore.instance
-                          .collection("Orders")
-                          .doc(order['id'])
-                          .update({"Status": selectedStatus});
-                      
-                      // Cập nhật trạng thái trong danh sách local
-                      setState(() {
-                        int index = orders.indexWhere((o) => o['id'] == order['id']);
-                        if (index != -1) {
-                          orders[index]['Status'] = selectedStatus;
-                        }
-                      });
-                      
-                      Navigator.pop(context);
-                      
-                      // Hiển thị thông báo thành công
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Đã cập nhật trạng thái đơn hàng"),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                      
-                      // Refresh UI
-                      this.setState(() {});
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("Lỗi: $e"),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Hủy"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  // Cập nhật trạng thái đơn hàng
+                  await FirebaseFirestore.instance
+                      .collection("Orders")
+                      .doc(order['id'])
+                      .update({"Status": selectedStatus});
+                  
+                  // Cập nhật trạng thái trong danh sách local
+                  setState(() {
+                    int index = orders.indexWhere((o) => o['id'] == order['id']);
+                    if (index != -1) {
+                      orders[index]['Status'] = selectedStatus;
                     }
-                  },
-                  child: Text("Cập nhật"),
-                ),
-              ],
-            );
-          },
+                  });
+                  
+                  Navigator.pop(context);
+                  
+                  // Hiển thị thông báo thành công
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Đã cập nhật trạng thái đơn hàng"),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Lỗi: $e"),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: Text("Cập nhật"),
+            ),
+          ],
         );
       },
     );
