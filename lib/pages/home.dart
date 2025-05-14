@@ -9,6 +9,7 @@ import 'package:shopping_app/services/shared_pref.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shopping_app/services/cart_service.dart';
+import 'package:shopping_app/pages/product_detail.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -126,19 +127,51 @@ class _HomeState extends State<Home> {
                                         fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => CartPage()),
-                                );
-                              },
-                              child: Icon(
-                                Icons.shopping_cart_outlined,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            )
+                            Stack(
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => CartPage()),
+                                    ).then((_) {
+                                      // Cập nhật UI khi quay lại từ trang giỏ hàng
+                                      setState(() {});
+                                    });
+                                  },
+                                  child: Icon(
+                                    Icons.shopping_cart_outlined,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                ),
+                                if (CartService.cartItems.isNotEmpty)
+                                  Positioned(
+                                    right: 0,
+                                    top: 0,
+                                    child: Container(
+                                      padding: EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: BoxConstraints(
+                                        minWidth: 16,
+                                        minHeight: 16,
+                                      ),
+                                      child: Text(
+                                        '${CartService.cartItems.length}',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                         SizedBox(height: 30),
@@ -328,17 +361,33 @@ class _HomeState extends State<Home> {
                                       // Phần ảnh sản phẩm
                                       Stack(
                                         children: [
-                                          Container(
-                                            height: 120,
-                                            width: double.infinity,
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.only(
-                                                topLeft: Radius.circular(10),
-                                                topRight: Radius.circular(10),
-                                              ),
-                                              child: Image.memory(
-                                                bytes,
-                                                fit: BoxFit.cover,
+                                          GestureDetector(
+                                            onTap: () {
+                                              // Chuyển đến trang chi tiết sản phẩm khi nhấn vào hình ảnh
+                                              Navigator.push(
+                                                context, 
+                                                MaterialPageRoute(
+                                                  builder: (context) => ProductDetail(
+                                                    detail: ds["Detail"] ?? "",
+                                                    image: ds["Image"],
+                                                    name: ds["Name"],
+                                                    price: originalPrice
+                                                  )
+                                                )
+                                              );
+                                            },
+                                            child: Container(
+                                              height: 120,
+                                              width: double.infinity,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.only(
+                                                  topLeft: Radius.circular(10),
+                                                  topRight: Radius.circular(10),
+                                                ),
+                                                child: Image.memory(
+                                                  bytes,
+                                                  fit: BoxFit.cover,
+                                                ),
                                               ),
                                             ),
                                           ),

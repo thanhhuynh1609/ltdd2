@@ -437,14 +437,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
               "PaymentMethod": paymentMethod,
               "TotalAmount": orderTotal.toString(),
               "Status": "Đang xử lý",
-              "UserId": await SharedPreferenceHelper().getUserId(), // Thêm UserId
+              "UserId": await SharedPreferenceHelper().getUserId(),
+              "CreatedAt": FieldValue.serverTimestamp(), // Thêm thời gian tạo đơn hàng
               "Products": itemsToCheckout.map((item) => {
                 "Name": item.name,
                 "Price": item.price.toString(),
                 "Quantity": item.quantity,
-                "Image": item.image,
                 "Brand": item.brand,
                 "Detail": item.detail,
+                // Lưu trữ tham chiếu đến hình ảnh thay vì base64
+                "ImageRef": "products/${item.brand}_${item.name.replaceAll(' ', '_')}", 
               }).toList(),
             };
 

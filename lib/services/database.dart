@@ -158,31 +158,61 @@ class DatabaseMethods {
 
   // Tạo đơn hàng mới với cấu trúc gộp sản phẩm
   Future createOrder(Map<String, dynamic> orderMap) async {
-    // Đảm bảo các trường số được lưu dưới dạng chuỗi
-    if (orderMap.containsKey('TotalAmount') && orderMap['TotalAmount'] is num) {
-      orderMap['TotalAmount'] = orderMap['TotalAmount'].toString();
-    }
-    
-    // Đảm bảo OrderId là chuỗi
-    if (orderMap.containsKey('OrderId') && orderMap['OrderId'] is num) {
-      orderMap['OrderId'] = orderMap['OrderId'].toString();
-    }
-    
-    // Xử lý danh sách sản phẩm
-    if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
-      List products = orderMap['Products'];
-      for (int i = 0; i < products.length; i++) {
-        if (products[i]['Price'] is num) {
-          products[i]['Price'] = products[i]['Price'].toString();
-        }
-        if (products[i]['Quantity'] is num) {
-          products[i]['Quantity'] = products[i]['Quantity'].toString();
-        }
+    try {
+      // Đảm bảo các trường số được lưu dưới dạng chuỗi
+      if (orderMap.containsKey('TotalAmount') && orderMap['TotalAmount'] is num) {
+        orderMap['TotalAmount'] = orderMap['TotalAmount'].toString();
       }
+      
+      // Đảm bảo OrderId là chuỗi
+      if (orderMap.containsKey('OrderId') && orderMap['OrderId'] is num) {
+        orderMap['OrderId'] = orderMap['OrderId'].toString();
+      }
+      
+      // Xử lý danh sách sản phẩm
+      if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
+        List products = orderMap['Products'];
+        
+        // Tạo danh sách sản phẩm mới không chứa hình ảnh base64
+        List<Map<String, dynamic>> optimizedProducts = [];
+        
+        for (int i = 0; i < products.length; i++) {
+          Map<String, dynamic> product = Map<String, dynamic>.from(products[i]);
+          
+          // Chuyển đổi các trường số thành chuỗi
+          if (product['Price'] is num) {
+            product['Price'] = product['Price'].toString();
+          }
+          if (product['Quantity'] is num) {
+            product['Quantity'] = product['Quantity'].toString();
+          }
+          
+          // Loại bỏ hình ảnh base64 từ sản phẩm
+          if (product.containsKey('Image')) {
+            // Lưu tham chiếu đến hình ảnh thay vì base64
+            String productName = product['Name'] ?? '';
+            String brand = product['Brand'] ?? '';
+            product['ImageRef'] = "products/${brand}_${productName.replaceAll(' ', '_')}";
+            product.remove('Image');
+          }
+          
+          optimizedProducts.add(product);
+        }
+        
+        // Thay thế danh sách sản phẩm cũ bằng danh sách đã tối ưu
+        orderMap['Products'] = optimizedProducts;
+      }
+      
+      // Thêm timestamp
+      orderMap['CreatedAt'] = FieldValue.serverTimestamp();
+      
+      // Lưu đơn hàng vào Firestore
+      return await FirebaseFirestore.instance
+          .collection("Orders")
+          .add(orderMap);
+    } catch (e) {
+      print("Lỗi khi tạo đơn hàng: $e");
+      throw e;
     }
-    
-    return await FirebaseFirestore.instance
-        .collection("Orders")
-        .add(orderMap);
   }
 }
