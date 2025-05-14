@@ -29,11 +29,12 @@ class DatabaseMethods {
         .add(userInfoMap);
   }
 
-  // Thêm sản phẩm vào collection theo danh mục
-  Future addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
-    return await FirebaseFirestore.instance
+  // Thêm sản phẩm vào collection theo danh mục và trả về ID của document
+  Future<String> addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
+    DocumentReference docRef = await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
+    return docRef.id;
   }
 
   // Cập nhật trạng thái đơn hàng

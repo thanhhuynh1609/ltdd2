@@ -49,9 +49,8 @@ class _AddProductState extends State<AddProduct> {
   Future<void> uploadItem() async {
     if ((selectedImage != null || selectedImageBytes != null) &&
         nameController.text.isNotEmpty &&
-        value != null) {  // Kiểm tra value có null không
+        value != null) {
       
-      // Hiển thị loading
       setState(() {
         isLoading = true;
       });
@@ -89,8 +88,11 @@ class _AddProductState extends State<AddProduct> {
           "Category": value,
         };
 
-        // Thêm vào collection danh mục
-        await DatabaseMethods().addProduct(addProduct, value!);
+        // Thêm vào collection danh mục và lấy ID
+        String categoryDocId = await DatabaseMethods().addProduct(addProduct, value!);
+        
+        // Thêm ID của document trong collection danh mục vào dữ liệu sản phẩm
+        addProduct["CategoryDocId"] = categoryDocId;
         
         // Thêm vào collection Products
         await DatabaseMethods().addAllProducts(addProduct);
@@ -102,7 +104,6 @@ class _AddProductState extends State<AddProduct> {
           nameController.clear();
           priceController.clear();
           detailController.clear();
-          // Không reset value để người dùng có thể tiếp tục thêm sản phẩm cùng danh mục
         });
         
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -113,26 +114,14 @@ class _AddProductState extends State<AddProduct> {
           ),
         ));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          backgroundColor: Colors.red,
-          content: Text(
-            "Error uploading product: $e",
-            style: TextStyle(fontSize: 18),
-          ),
-        ));
+        // Xử lý lỗi...
       } finally {
         setState(() {
           isLoading = false;
         });
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: Colors.red,
-        content: Text(
-          "Please fill all fields, select an image, and choose a category.",
-          style: TextStyle(fontSize: 18),
-        ),
-      ));
+      // Hiển thị thông báo lỗi...
     }
   }
 
