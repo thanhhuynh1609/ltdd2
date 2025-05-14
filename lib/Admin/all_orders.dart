@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 class AllOrders extends StatefulWidget {
   const AllOrders({Key? key}) : super(key: key);
@@ -86,45 +88,136 @@ class _AllOrdersState extends State<AllOrders> {
     String currentStatus = order['Status'] ?? "Đang xử lý";
     String selectedStatus = currentStatus;
     
+    // Lấy danh sách sản phẩm
+    List<dynamic> products = [];
+    if (order['Products'] != null && order['Products'] is List) {
+      products = order['Products'] as List<dynamic>;
+    }
+    
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text("Cập nhật trạng thái đơn hàng"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Chọn trạng thái mới:"),
-                  SizedBox(height: 10),
-                  DropdownButton<String>(
-                    value: selectedStatus,
-                    isExpanded: true,
-                    items: [
-                      "Đang xử lý",
-                      "Đang giao hàng",
-                      "Đã giao hàng",
-                      "Đã hủy"
-                    ].map((status) {
-                      return DropdownMenuItem<String>(
-                        value: status,
-                        child: Text(status),
+              title: Text("Chi tiết đơn hàng"),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Mã đơn hàng
+                    Text(
+                      "Mã đơn: #${safeString(order['id']).length > 8 ? safeString(order['id']).substring(0, 8) : safeString(order['id'])}",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 10),
+                    
+                    // Thông tin khách hàng
+                    Text("Khách hàng: ${safeString(order['CustomerName'])}"),
+                    Text("Email: ${safeString(order['CustomerEmail'])}"),
+                    Text("Địa chỉ: ${safeString(order['ShippingAddress'])}"),
+                    Text("SĐT: ${safeString(order['PhoneNumber'])}"),
+                    
+                    SizedBox(height: 15),
+                    Divider(),
+                    
+                    // Danh sách sản phẩm
+                    Text(
+                      "Sản phẩm:",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 10),
+                    
+                    ...products.map((product) {
+                      String productName = safeString(product['Name']);
+                      String productPrice = safeString(product['Price']);
+                      String productQuantity = safeString(product['Quantity']);
+                      
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            // Icon sản phẩm
+                            Container(
+                              height: 30,
+                              width: 30,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Icon(
+                                Icons.shopping_bag,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            // Thông tin sản phẩm
+                            Expanded(
+                              child: Text(
+                                "$productName - $productQuantity x \$${productPrice}",
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          selectedStatus = value;
-                        });
-                      }
-                    },
-                  ),
-                ],
+                    
+                    Divider(),
+                    SizedBox(height: 10),
+                    
+                    // Tổng tiền
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Tổng tiền:",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          "\$${safeString(order['TotalAmount'])}",
+                          style: TextStyle(
+                            color: Color(0xfffd6f3e),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 20),
+                    
+                    // Cập nhật trạng thái
+                    Text("Cập nhật trạng thái:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 10),
+                    DropdownButton<String>(
+                      value: selectedStatus,
+                      isExpanded: true,
+                      items: [
+                        "Đang xử lý",
+                        "Đang giao hàng",
+                        "Đã giao hàng",
+                        "Đã hủy"
+                      ].map((status) {
+                        return DropdownMenuItem<String>(
+                          value: status,
+                          child: Text(status),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedStatus = value;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
               actions: [
-                // Thêm nút xóa đơn hàng
+                // Nút xóa đơn hàng
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
@@ -179,14 +272,11 @@ class _AllOrdersState extends State<AllOrders> {
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xfffd6f3e),
-                  ),
                   child: Text("Cập nhật"),
                 ),
               ],
             );
-          }
+          },
         );
       },
     );
@@ -365,15 +455,6 @@ class _AllOrdersState extends State<AllOrders> {
           products = order['Products'] as List<dynamic>;
         }
         
-        // Lấy thông tin sản phẩm đầu tiên để hiển thị
-        String productName = "Samsung"; // Giá trị mặc định
-        if (products.isNotEmpty && products.first is Map) {
-          var firstProduct = products.first;
-          if (firstProduct['Name'] != null) {
-            productName = safeString(firstProduct['Name']);
-          }
-        }
-        
         return GestureDetector(
           onTap: () {
             // Hiển thị dialog cập nhật trạng thái
@@ -385,121 +466,165 @@ class _AllOrdersState extends State<AllOrders> {
               elevation: 3,
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: EdgeInsets.all(15),
                 width: MediaQuery.of(context).size.width,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Phần header của đơn hàng
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Hiển thị icon thay vì ảnh
-                        Container(
-                          height: 120,
-                          width: 120,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.grey[200],
-                          ),
-                          child: Icon(
-                            Icons.shopping_bag,
-                            size: 50,
-                            color: Colors.grey[600],
+                        Text(
+                          "Đơn hàng #${safeSubstring(safeString(order['id']), 0, 8)}",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Spacer(),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(height: 10),
-                              Text(
-                                "Mã đơn: #${safeString(order['id']).length > 8 ? safeString(order['id']).substring(0, 8) : safeString(order['id'])}",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
+                        Container(
+                          padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: getStatusColor(status),
+                            borderRadius: BorderRadius.circular(10)
+                          ),
+                          child: Text(
+                            status.isEmpty ? "Đang xử lý" : status,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 10),
+                    
+                    // Thông tin khách hàng
+                    Text(
+                      "Tên: " + (customerName.isEmpty ? "User" : customerName),
+                      style: AppWidget.semiboldTextFeildStyle(),
+                    ),
+                    Text(
+                      "Email: " + (customerEmail.isEmpty ? "leanh@example.com" : customerEmail),
+                      style: AppWidget.lightTextFeildStyle(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    SizedBox(height: 15),
+                    
+                    // Danh sách sản phẩm
+                    ...products.map((product) {
+                      String productName = safeString(product['Name']);
+                      String productPrice = safeString(product['Price']);
+                      String productQuantity = safeString(product['Quantity']);
+                      
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            // Icon sản phẩm
+                            Container(
+                              height: 40,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              SizedBox(height: 5),
-                              Text(
-                                "Tên: " + (customerName.isEmpty ? "User" : customerName),
-                                style: AppWidget.semiboldTextFeildStyle(),
+                              child: Icon(
+                                Icons.shopping_bag,
+                                size: 20,
+                                color: Colors.grey[600],
                               ),
-                              Container(
-                                width: MediaQuery.of(context).size.width/3,
-                                child: Text(
-                                  "Email: " + (customerEmail.isEmpty ? "leanh@example.com" : customerEmail),
-                                  style: AppWidget.lightTextFeildStyle(),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            ),
+                            SizedBox(width: 10),
+                            // Thông tin sản phẩm
+                            Expanded(
+                              child: Text(
+                                "$productName\n$productQuantity x \$${productPrice}",
+                                style: TextStyle(fontSize: 14),
                               ),
-                              SizedBox(height: 5),
-                              Text(
-                                productName + (products.length > 1 ? " + ${products.length - 1} sản phẩm khác" : ""),
-                                style: AppWidget.semiboldTextFeildStyle(),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    
+                    // Đường kẻ phân cách
+                    Divider(height: 20, thickness: 1),
+                    
+                    // Tổng tiền
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Tổng tiền:",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          "\$${totalAmount.isEmpty ? "0" : totalAmount}",
+                          style: TextStyle(
+                            color: Color(0xfffd6f3e),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 10),
+                    
+                    // Các nút hành động
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // Nút cập nhật trạng thái
+                        GestureDetector(
+                          onTap: () {
+                            showStatusUpdateDialog(order);
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(10)
+                            ),
+                            child: Text(
+                              "Cập nhật",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                "${totalAmount.isEmpty ? "0" : totalAmount} đ",
-                                style: TextStyle(
-                                  color: Color(0xfffd6f3e),
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        // Nút xóa
+                        GestureDetector(
+                          onTap: () {
+                            deleteOrder(order['id']);
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10)
+                            ),
+                            child: Text(
+                              "Xóa",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
-                              SizedBox(height: 10), 
-                              Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      showStatusUpdateDialog(order);
-                                    },
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                                      decoration: BoxDecoration(
-                                        color: getStatusColor(status),
-                                        borderRadius: BorderRadius.circular(10)
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          status.isEmpty ? "Đang xử lý" : status,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 10),
-                                  // Thêm nút xóa trực tiếp
-                                  GestureDetector(
-                                    onTap: () {
-                                      deleteOrder(order['id']);
-                                    },
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(10)
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          "Xóa",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            ],
+                            ),
                           ),
                         ),
                       ],

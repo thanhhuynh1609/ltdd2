@@ -426,6 +426,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
             // Lấy danh sách sản phẩm cần thanh toán
             List<CartItem> itemsToCheckout = checkoutItems;
             
+            // Chuẩn bị dữ liệu sản phẩm trong đơn hàng
+            List<Map<String, dynamic>> productsList = itemsToCheckout.map((item) {
+              // Kiểm tra xem item.image là URL hay base64
+              String imageField = "ProductImage";
+              String imageValue = item.image;
+              
+              // Nếu là URL, sử dụng trường Image
+              if (item.image.startsWith('http')) {
+                imageField = "Image";
+              }
+              
+              Map<String, dynamic> productMap = {
+                "Name": item.name,
+                "Price": item.price.toString(),
+                "Quantity": item.quantity.toString(),
+                "Brand": item.brand ?? "",
+                "Detail": item.detail ?? "",
+              };
+              
+              // Thêm trường hình ảnh với tên trường phù hợp
+              productMap[imageField] = imageValue;
+              
+              return productMap;
+            }).toList();
+
             // Tạo một document đơn hàng chính
             Map<String, dynamic> orderMap = {
               "OrderId": orderId,
@@ -439,15 +464,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               "Status": "Đang xử lý",
               "UserId": await SharedPreferenceHelper().getUserId(),
               "CreatedAt": FieldValue.serverTimestamp(), // Thêm thời gian tạo đơn hàng
-              "Products": itemsToCheckout.map((item) => {
-                "Name": item.name,
-                "Price": item.price.toString(),
-                "Quantity": item.quantity,
-                "Brand": item.brand,
-                "Detail": item.detail,
-                // Lưu trữ tham chiếu đến hình ảnh thay vì base64
-                "ImageRef": "products/${item.brand}_${item.name.replaceAll(' ', '_')}", 
-              }).toList(),
+              "Products": productsList,
             };
 
             await DatabaseMethods().createOrder(orderMap);

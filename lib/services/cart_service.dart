@@ -45,4 +45,17 @@ class CartService {
   static void clearCart() {
     cartItems.clear();
   }
+
+  // Chuyển đổi CartItem thành Map để lưu vào đơn hàng
+  static Map<String, dynamic> cartItemToMap(CartItem item) {
+    return {
+      "Name": item.name,
+      "Price": item.price.toString(),
+      "Quantity": item.quantity.toString(),
+      "Brand": item.brand ?? "",
+      "Detail": item.detail ?? "",
+      "ProductImage": item.image, // Đổi từ "Image" thành "ProductImage"
+      // Thêm các trường khác nếu cần
+    };
+  }
 }

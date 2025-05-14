@@ -188,18 +188,18 @@ class DatabaseMethods {
           }
           
           // Loại bỏ hình ảnh base64 từ sản phẩm
-          if (product.containsKey('Image')) {
+          if (product.containsKey('ProductImage')) { // Đổi từ "Image" thành "ProductImage"
             // Lưu tham chiếu đến hình ảnh thay vì base64
             String productName = product['Name'] ?? '';
             String brand = product['Brand'] ?? '';
             product['ImageRef'] = "products/${brand}_${productName.replaceAll(' ', '_')}";
-            product.remove('Image');
+            product.remove('ProductImage');
           }
           
           optimizedProducts.add(product);
         }
         
-        // Thay thế danh sách sản phẩm cũ bằng danh sách đã tối ưu
+        // Cập nhật danh sách sản phẩm trong orderMap
         orderMap['Products'] = optimizedProducts;
       }
       

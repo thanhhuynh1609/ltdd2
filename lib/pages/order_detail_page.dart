@@ -198,106 +198,111 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             ),
           ),
           Divider(height: 1),
-          ListView.separated(
+          ListView.builder(
             shrinkWrap: true,
             physics: NeverScrollableScrollPhysics(),
             itemCount: products.length,
-            separatorBuilder: (context, index) => Divider(height: 1),
             itemBuilder: (context, index) {
               var product = products[index];
+              String brand = product['Brand'] ?? "";
               String productName = product['Name'] ?? "Sản phẩm";
               double price = double.parse(product['Price'] ?? "0");
-              int quantity = product['Quantity'] ?? 1;
-              String brand = product['Brand'] ?? "";
+              int quantity = int.parse(product['Quantity'] ?? "1");
               
               // Giải mã base64 từ Firestore
-              String base64Image = product["Image"] ?? "";
+              String base64Image = "";
+              if (product["ProductImage"] != null && product["ProductImage"].toString().isNotEmpty) {
+                base64Image = product["ProductImage"];
+              } else if (product["Image"] != null && product["Image"].toString().isNotEmpty) {
+                base64Image = product["Image"];
+              }
+              
               Uint8List? imageBytes;
-
               try {
-                imageBytes = base64Decode(base64Image);
+                if (base64Image.isNotEmpty) {
+                  imageBytes = base64Decode(base64Image);
+                }
               } catch (e) {
                 print("Error decoding base64 image: $e");
-                imageBytes = null;
               }
-
-              return Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // Hình ảnh sản phẩm
-                    Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+              
+              return Card(
+                margin: EdgeInsets.only(bottom: 16),
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      // Hình ảnh sản phẩm
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey[200],
+                        ),
                         child: imageBytes != null
-                            ? Image.memory(
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(
                                 imageBytes,
                                 fit: BoxFit.cover,
-                              )
-                            : Container(
-                                color: Colors.grey[200],
-                                child: Icon(Icons.image_not_supported, color: Colors.grey),
                               ),
+                            )
+                          : Icon(Icons.image_not_supported, color: Colors.grey),
                       ),
-                    ),
-                    SizedBox(width: 16),
-                    
-                    // Thông tin sản phẩm
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (brand.isNotEmpty)
-                            Row(
-                              children: [
-                                Text(
-                                  brand,
-                                  style: TextStyle(
-                                    color: Colors.blue,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 14,
+                      SizedBox(width: 16),
+                      
+                      // Thông tin sản phẩm
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (brand.isNotEmpty)
+                              Row(
+                                children: [
+                                  Text(
+                                    brand,
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14,
+                                    ),
                                   ),
-                                ),
-                                SizedBox(width: 5),
-                                Icon(Icons.verified, color: Colors.blue, size: 14),
-                              ],
+                                  SizedBox(width: 5),
+                                  Icon(Icons.verified, color: Colors.blue, size: 14),
+                                ],
+                              ),
+                            if (brand.isNotEmpty)
+                              SizedBox(height: 4),
+                            Text(
+                              productName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
-                          if (brand.isNotEmpty)
+                            SizedBox(height: 8),
+                            Text(
+                              "Số lượng: $quantity",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
                             SizedBox(height: 4),
-                          Text(
-                            productName,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                            Text(
+                              "\$${price.toStringAsFixed(1)}",
+                              style: TextStyle(
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            "Số lượng: $quantity",
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            "\$${price.toStringAsFixed(1)}",
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -592,6 +597,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   
   DateFormat(String s) {}
 }
+
 
 
 
