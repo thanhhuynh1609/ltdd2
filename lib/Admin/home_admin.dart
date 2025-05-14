@@ -15,18 +15,23 @@ class _HomeAdminState extends State<HomeAdmin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xfff2f2f2),
-      appBar: AppBar(
-        backgroundColor: Color(0xfff2f2f2),
-        title: Text(
-          'Trang quản trị',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
+      backgroundColor: Colors.white,
+
       body: Container(
         margin: EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Image.asset("images/logook.png", width: 170,),
+            SizedBox(height: 30,),
+            Text(
+                "Admin Home",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold
+              ),
+            ),
+            SizedBox(height: 30,),
             // Nút thêm sản phẩm
             _buildAdminButton(
               icon: Icons.add_circle_outline,
@@ -102,7 +107,7 @@ class _HomeAdminState extends State<HomeAdmin> {
             Icon(
               icon,
               size: 30.0,
-              color: Color(0xfffd6f3e),
+              color: Color(0xff4b69fe),
             ),
             SizedBox(width: 20.0),
             Text(

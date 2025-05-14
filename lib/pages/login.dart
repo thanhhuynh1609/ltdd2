@@ -25,7 +25,27 @@ class _LoginState extends State<Login> {
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-
+      
+      // Kiểm tra xem tài khoản có bị đánh dấu là "đã xóa" hay không
+      DocumentSnapshot deletedUserDoc = await FirebaseFirestore.instance
+          .collection("deleted_users")
+          .doc(userCredential.user!.uid)
+          .get();
+      
+      if (deletedUserDoc.exists) {
+        // Tài khoản đã bị xóa, đăng xuất và hiển thị thông báo
+        await FirebaseAuth.instance.signOut();
+        
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text("Tài khoản này đã bị vô hiệu hóa bởi quản trị viên", 
+                       style: TextStyle(fontSize: 18)),
+        ));
+        
+        return;
+      }
+      
+      // Tiếp tục quá trình đăng nhập bình thường
       // Fetch dữ liệu người dùng từ Firestore bằng UID
       Map<String, dynamic>? userData = await DatabaseMethods()
           .getUserDetails(userCredential.user!.uid);

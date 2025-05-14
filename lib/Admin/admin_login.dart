@@ -13,54 +13,53 @@ class AdminLogin extends StatefulWidget {
 class _AdminLoginState extends State<AdminLogin> {
   TextEditingController usernamecontroller = new TextEditingController();
   TextEditingController userpasswordcontroller = new TextEditingController();
+
+
+  bool isChecked = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Container(
           margin: EdgeInsets.only(top: 40, left: 20, right: 20, bottom: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.asset("images/logo03.png"),
-              Center(
-                  child: Text(
-                "Admin Panel",
+              Image.asset("images/logook.png", width: 170,),
+              SizedBox(height: 20,),
+              Text(
+                "Hello, Administrator!",
                 style: AppWidget.semiboldTextFeildStyle(),
-              )),
+              ),
+              Text("Manage your system securely and efficiently.", style: TextStyle(fontSize: 18),),
               SizedBox(
                 height: 20,
-              ),
-              Text(
-                "Username ",
-                style: AppWidget.semiboldTextFeildStyle(),
               ),
               SizedBox(
                 height: 20,
               ),
               Container(
-                padding: EdgeInsets.only(left: 20),
                 decoration: BoxDecoration(
                     color: Color(0xfff4f5f9),
                     borderRadius: BorderRadius.circular(10)),
                 child: TextFormField(
                   controller: usernamecontroller,
                   decoration: InputDecoration(
-                      border: InputBorder.none, hintText: "Username"),
+                      prefixIcon: Icon(Icons.person_outlined, color: Colors.grey,),
+                      border: InputBorder.none, hintText: "Username",
+                    contentPadding: EdgeInsets.symmetric(vertical: 20),
+                  ),
                 ),
               ),
               SizedBox(
                 height: 20,
               ),
-              Text(
-                "Password",
-                style: AppWidget.semiboldTextFeildStyle(),
-              ),
               SizedBox(
                 height: 20,
               ),
               Container(
-                padding: EdgeInsets.only(left: 20),
                 decoration: BoxDecoration(
                     color: Color(0xfff4f5f9),
                     borderRadius: BorderRadius.circular(10)),
@@ -68,22 +67,68 @@ class _AdminLoginState extends State<AdminLogin> {
                   obscureText: true,
                   controller: userpasswordcontroller,
                   decoration: InputDecoration(
-                      border: InputBorder.none, hintText: "Password"),
+                      prefixIcon: Icon(Icons.password_outlined, color: Colors.grey,),
+                      border: InputBorder.none, hintText: "Password",
+                      contentPadding: EdgeInsets.symmetric(vertical: 20),
+                  ),
                 ),
               ),
               SizedBox(
                 height: 30,
               ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isChecked,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            isChecked = value!;
+                          });
+                        },
+                        activeColor: Color(0xff4b69fe), // màu khi tick
+                        checkColor: Colors.white,  // màu dấu tick
+                      ),
+                      Text(
+                        "Remember me!",
+                        style: TextStyle(
+                            color: Color(0xff7e7e7e),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold
+                        ),
+                      )
+                    ],
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => AdminLogin()));
+                    },
+                    child: Text(
+                      "Forgot Password?",
+                      style: TextStyle(
+                          color: Color(0xFFb8b4cc),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 30,),
               GestureDetector(
                 onTap: () {
                   loginAdmin();
                 },
                 child: Center(
                   child: Container(
-                    width: MediaQuery.of(context).size.width / 2,
+                    width: MediaQuery.of(context).size.width,
                     padding: EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: Color(0xff4b69fe),
                         borderRadius: BorderRadius.circular(20)),
                     child: Center(
                         child: Text(

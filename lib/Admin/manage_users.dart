@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/Admin/edit_user.dart';
 import 'package:shopping_app/services/database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ManageUsers extends StatefulWidget {
   const ManageUsers({Key? key}) : super(key: key);
@@ -33,14 +34,21 @@ class _ManageUsersState extends State<ManageUsers> {
         isLoading = true;
       });
       
+      // 1. Xóa dữ liệu người dùng từ Firestore
       await DatabaseMethods().deleteUser(userId);
+      
+      // 2. Đánh dấu tài khoản này là "đã xóa" trong Firestore
+      await FirebaseFirestore.instance.collection("deleted_users").doc(userId).set({
+        "email": email,
+        "deletedAt": FieldValue.serverTimestamp(),
+      });
       
       setState(() {
         isLoading = false;
       });
       
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text("Người dùng đã được xóa thành công"),
+        content: Text("Người dùng đã được xóa khỏi hệ thống"),
         backgroundColor: Colors.green,
       ));
     } catch (e) {
@@ -58,7 +66,9 @@ class _ManageUsersState extends State<ManageUsers> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Text("Quản lý người dùng"),
       ),
       floatingActionButton: FloatingActionButton(
@@ -158,7 +168,7 @@ class UserCard extends StatelessWidget {
               radius: 30,
               backgroundImage: imageUrl != null && imageUrl.isNotEmpty
                 ? NetworkImage(imageUrl)
-                : AssetImage("images/user_placeholder.png") as ImageProvider,
+                : AssetImage("images/boy.jpg") as ImageProvider,
               backgroundColor: Colors.grey[200],
             ),
             SizedBox(width: 16),
@@ -222,3 +232,4 @@ class UserCard extends StatelessWidget {
     );
   }
 }
+

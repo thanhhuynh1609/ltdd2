@@ -86,7 +86,9 @@ class _ManageProductsState extends State<ManageProducts> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Text("Quản lý sản phẩm"),
       ),
       body: Container(

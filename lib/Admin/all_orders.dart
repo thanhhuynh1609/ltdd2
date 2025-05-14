@@ -165,7 +165,10 @@ Widget allOrders() {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Center(child: Text("All Orders", style: AppWidget.boldTextFeildStyle(),)),),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        title: Center(child: Text("All Orders", style: AppWidget.boldTextFeildStyle(),)),),
       body: Container(
         margin: EdgeInsets.only(top: 20, left: 20, right: 20,),
         child: Column(children: [
