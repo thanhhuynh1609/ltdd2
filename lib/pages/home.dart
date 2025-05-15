@@ -2,9 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/category_products.dart';
+import 'package:shopping_app/pages/product_detail.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -15,6 +18,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   bool search = false;
+  bool isLoading = false;
 
   List categories = [
     "images/headphoneicon.png",
@@ -33,35 +37,56 @@ class _HomeState extends State<Home> {
   var queryResultSet = [];
   var tempSearchStore = [];
 
+  // Thêm biến để lưu danh sách sản phẩm được yêu thích nhất
+  List<Map<String, dynamic>> mostFavoriteProducts = [];
+
+  // Sửa hàm initiateSearch để tránh lỗi RangeError
   initiateSearch(value) {
+    // Reset search results if search term is empty
     if (value.length == 0) {
       setState(() {
         queryResultSet = [];
         tempSearchStore = [];
+        search = false;
+        isLoading = false;
       });
+      return;
     }
+    
     setState(() {
       search = true;
+      isLoading = true;
+      tempSearchStore = [];
     });
 
-    var CapitalizedValue =
-        value.substring(0, 1).toUpperCase() + value.substring(1);
-    if (queryResultSet.isEmpty && value.length == 1) {
-      DatabaseMethods().search(value).then((QuerySnapshot docs) {
+    // Perform search in Firestore - sửa để tránh lỗi RangeError
+    DatabaseMethods().getAllProductsSnapshot().then((QuerySnapshot docs) {
+      setState(() {
+        isLoading = false;
+        queryResultSet = [];
+        // Add all documents to queryResultSet
         for (int i = 0; i < docs.docs.length; ++i) {
-          queryResultSet.add(docs.docs[i].data());
+          if (docs.docs[i].data() != null) {
+            queryResultSet.add(docs.docs[i].data());
+          }
         }
-      });
-    } else {
-      tempSearchStore = [];
-      queryResultSet.forEach((element) {
-        if (element['UpdateName'].startsWith(CapitalizedValue)) {
-          setState(() {
+        
+        tempSearchStore = [];
+        // Filter results manually
+        queryResultSet.forEach((element) {
+          // Check if Name contains search term (case insensitive)
+          if (element['Name'] != null && 
+              element['Name'].toString().toLowerCase().contains(value.toLowerCase())) {
             tempSearchStore.add(element);
-          });
-        }
+          }
+        });
       });
-    }
+    }).catchError((error) {
+      setState(() {
+        isLoading = false;
+      });
+      print("Error in search: $error");
+    });
   }
 
   String? name, image;
@@ -72,15 +97,94 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  ontheload() async {
+  // Thêm phương thức getontheload nếu chưa có
+  void getontheload() async {
     await getthesharedpref();
     setState(() {});
   }
 
+  // Sửa lỗi cú pháp return
+  Widget mostFavoriteProductsSection() {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Sản phẩm được yêu thích",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 10),
+          FutureBuilder<QuerySnapshot>(
+            future: DatabaseMethods().getMostFavoriteProducts(5),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              }
+              
+              if (snapshot.hasError) {
+                return Center(child: Text("Đã xảy ra lỗi"));
+              }
+              
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Center(child: Text("Không có sản phẩm nào"));
+              }
+              
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, index) {
+                  var doc = snapshot.data!.docs[index];
+                  return buildResultCard(doc);
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
-    ontheload();
     super.initState();
+    getontheload();
+    loadMostFavoriteProducts();
+  }
+
+  // Thêm hàm để kiểm tra tất cả sản phẩm
+  void showAllProducts() {
+    setState(() {
+      isLoading = true;
+    });
+    
+    DatabaseMethods().getAllProductsSnapshot().then((QuerySnapshot docs) {
+      setState(() {
+        isLoading = false;
+      });
+      // Hiển thị tổng số sản phẩm
+      print("Total products: ${docs.docs.length}");
+      
+      // Duyệt qua từng sản phẩm và in ra tên
+      docs.docs.forEach((doc) {
+        // Kiểm tra xem doc.data() có tồn tại và có trường 'Name' không
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        if (data != null && data.containsKey('Name')) {
+          print("Product: ${data['Name']}");
+        } else {
+          print("Product without name: ${doc.id}");
+        }
+      });
+    }).catchError((error) {
+      setState(() {
+        isLoading = false;
+      });
+      print("Error fetching all products: $error");
+    });
   }
 
   @override
@@ -122,11 +226,20 @@ class _HomeState extends State<Home> {
                                         fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            Icon(
-                              Icons.shopping_cart_outlined,
-                              color: Colors.white,
-                              size: 30,
-                            )
+                            Row(
+                              children: [
+                                // Thêm nút để kiểm tra sản phẩm
+                                IconButton(
+                                  icon: Icon(Icons.refresh, color: Colors.white),
+                                  onPressed: showAllProducts,
+                                ),
+                                Icon(
+                                  Icons.shopping_cart_outlined,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                         SizedBox(height: 30),
@@ -153,15 +266,40 @@ class _HomeState extends State<Home> {
                         ),
                         SizedBox(height: 20),
                         search
-                            ? ListView(
-                          padding: EdgeInsets.only(left: 10, right: 10),
-                          primary: false,
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          children: tempSearchStore.map((element) {
-                            return buildResultCard(element);
-                          }).toList(),
-                        )
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: isLoading 
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(20.0),
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    )
+                                  : ListView(
+                                      padding: EdgeInsets.all(10),
+                                      primary: false,
+                                      shrinkWrap: true,
+                                      physics: NeverScrollableScrollPhysics(),
+                                      children: tempSearchStore.isEmpty
+                                          ? [
+                                              Center(
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(20.0),
+                                                  child: Text(
+                                                    "Không tìm thấy sản phẩm",
+                                                    style: TextStyle(fontSize: 16),
+                                                  ),
+                                                ),
+                                              )
+                                            ]
+                                          : tempSearchStore.map<Widget>((element) {
+                                              return buildResultCard(element);
+                                            }).toList(),
+                                    ),
+                              )
                             : Padding(
                           padding: const EdgeInsets.only(right: 20),
                           child: Row(
@@ -289,27 +427,211 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget buildResultCard(data) {
-    return Container(
-      height: 100,
-      child: Row(
-        children: [
-          Image.network(
-            data["Image"],
-            height: 50,
-            width: 50,
+  Widget buildResultCard(product) {
+    try {
+      // Kiểm tra xem hình ảnh có phải là base64 không
+      Widget imageWidget;
+      try {
+        if (product["Image"] == null || product["Image"].toString().isEmpty) {
+          // Nếu không có hình ảnh
+          imageWidget = Container(
+            width: 80,
+            height: 80,
+            color: Colors.grey[300],
+            child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+          );
+        } else if (product["Image"].toString().startsWith('http')) {
+          // Nếu là URL
+          imageWidget = Image.network(
+            product["Image"],
+            width: 80,
+            height: 80,
             fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              print("Error loading network image: $error");
+              return Container(
+                width: 80,
+                height: 80,
+                color: Colors.grey[300],
+                child: Icon(Icons.broken_image, color: Colors.grey[600]),
+              );
+            },
+          );
+        } else {
+          // Nếu là base64
+          try {
+            String base64Image = product["Image"];
+            // Xử lý base64 an toàn
+            if (base64Image.contains(',')) {
+              base64Image = base64Image.split(',').last;
+            }
+            
+            // Đảm bảo chuỗi base64 hợp lệ
+            base64Image = base64Image.trim();
+            
+            // Thêm padding nếu cần
+            while (base64Image.length % 4 != 0) {
+              base64Image += '=';
+            }
+            
+            Uint8List bytes = base64Decode(base64Image);
+            imageWidget = Image.memory(
+              bytes,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                print("Error displaying memory image: $error");
+                return Container(
+                  width: 80,
+                  height: 80,
+                  color: Colors.grey[300],
+                  child: Icon(Icons.broken_image, color: Colors.grey[600]),
+                );
+              },
+            );
+          } catch (e) {
+            print("Error decoding base64: $e");
+            imageWidget = Container(
+              width: 80,
+              height: 80,
+              color: Colors.grey[300],
+              child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+            );
+          }
+        }
+      } catch (e) {
+        // Nếu có lỗi, hiển thị ảnh mặc định
+        print("Error processing image: $e");
+        imageWidget = Container(
+          width: 80,
+          height: 80,
+          color: Colors.grey[300],
+          child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+        );
+      }
+      
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProductDetail(
+                detail: product["Detail"] ?? "",
+                image: product["Image"] ?? "",
+                name: product["Name"] ?? "",
+                price: product["Price"] ?? "",
+                productId: product.id, // Thêm productId
+                votes: product["votes"] ?? 0, // Thêm votes
+              ),
+            ),
+          );
+        },
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.3),
+                spreadRadius: 2,
+                blurRadius: 5,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
-          SizedBox(width: 10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: imageWidget,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      product["Name"] ?? "Unknown Product",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      "\$${product["Price"] ?? "0"}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xfffd6f3e),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      print("Error building result card: $e");
+      return Container(); // Return empty container on error
+    }
+  }
+
+  // Thêm widget hiển thị sản phẩm được yêu thích nhất
+   Widget topFavoriteProductsSection() {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            data["Name"],
-            style: AppWidget.semiboldTextFeildStyle()
-                .copyWith(color: Colors.white),
-          )
+            "Sản phẩm được yêu thích",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 10),
+          FutureBuilder<QuerySnapshot>(
+            future: DatabaseMethods().getMostFavoriteProducts(5),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              }
+              
+              if (snapshot.hasError) {
+                return Center(child: Text("Đã xảy ra lỗi"));
+              }
+              
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Center(child: Text("Không có sản phẩm nào"));
+              }
+              
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, index) {
+                  var doc = snapshot.data!.docs[index];
+                  return buildResultCard(doc);
+                },
+              );
+            },
+          ),
         ],
       ),
     );
   }
+  
+  void loadMostFavoriteProducts() {}
 }
 
 class CategoryTile extends StatelessWidget {

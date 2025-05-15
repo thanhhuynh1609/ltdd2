@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/Admin/admin_login.dart';
-import 'package:shopping_app/pages/bottomnav.dart';
+import 'package:shopping_app/pages/bottomnav.dart'; // Đảm bảo import này đúng
 import 'package:shopping_app/pages/signup.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
@@ -61,10 +61,12 @@ class _LoginState extends State<Login> {
       await SharedPreferenceHelper().saveUserId(userData["Id"]);
       await SharedPreferenceHelper().saveUserName(userData["Name"]);
       await SharedPreferenceHelper().saveUserImage(userData["Image"]);
+      // Trong phương thức đăng nhập thành công, thêm dòng sau
+      await SharedPreferenceHelper().saveUserId(userCredential.user!.uid);
 
       // Chuyển hướng đến Bottomnav
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => Bottomnav()));
+          context, MaterialPageRoute(builder: (context) => BottomNav()));
     } on FirebaseException catch (e) {
       if (e.code == 'user-not-found') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -136,6 +138,7 @@ class _LoginState extends State<Login> {
                       contentPadding: EdgeInsets.symmetric(vertical: 20),),
                   ),
                 ),
+                
                 SizedBox(height: 20),
                 // Text("Password", style: AppWidget.semiboldTextFeildStyle()),
                 SizedBox(height: 20),

@@ -1,11 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:random_string/random_string.dart';
-import 'package:shopping_app/pages/bottomnav.dart';
-import 'package:shopping_app/pages/login.dart';
+import 'package:shopping_app/pages/bottomnav.dart'; // Đảm bảo import này đúng
+import 'package:shopping_app/pages/login.dart'; // Import Login page
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
+import 'package:random_string/random_string.dart';
 
 class SignUp extends StatefulWidget {
   const SignUp({super.key});
@@ -53,7 +53,7 @@ class _SignUpState extends State<SignUp> {
 
         await DatabaseMethods().addUserDetails(userInfoMap, id);
         Navigator.push(
-            context, MaterialPageRoute(builder: (context) => Bottomnav()));
+            context, MaterialPageRoute(builder: (context) => BottomNav())); // Sửa Bottomnav thành BottomNav
       } on FirebaseAuthException catch (e) {
         if (e.code == 'weak-password') {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(

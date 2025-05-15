@@ -1,32 +1,27 @@
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:shopping_app/pages/Order.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:shopping_app/pages/home.dart';
+import 'package:shopping_app/pages/favorite_products.dart';
 import 'package:shopping_app/pages/profile.dart';
+import 'package:shopping_app/pages/Order.dart';
 
-class Bottomnav extends StatefulWidget {
-  const Bottomnav({super.key});
+class BottomNav extends StatefulWidget {
+  const BottomNav({Key? key}) : super(key: key);
 
   @override
-  State<Bottomnav> createState() => _BottomnavState();
+  State<BottomNav> createState() => _BottomNavState();
 }
 
-class _BottomnavState extends State<Bottomnav> {
-  late List<Widget> pages;
+class _BottomNavState extends State<BottomNav> {
+  int currentTabIndex = 0;
+  
+  late List<Widget> pages = [
+    Home(),
+    Order(),
+    FavoriteProducts(),
+    Profile(),
+  ];
 
-  late Home HomePage;
-  late Order order;
-  late Profile profile;
-  int currentTabIndex=0;
-
-  @override
-  void initState() {
-    HomePage= Home();
-    order = Order();
-    profile = Profile();
-    pages = [HomePage, order, profile];
-    super.initState();
-  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,17 +36,21 @@ class _BottomnavState extends State<Bottomnav> {
           });
         },
         items: [
-        Icon(
-          Icons.home_outlined,
-          color: Colors.white,
+          Icon(
+            Icons.home_outlined,
+            color: Colors.white,
           ),
           Icon(
-          Icons.shopping_bag_outlined,
-          color: Colors.white,
+            Icons.shopping_bag_outlined,
+            color: Colors.white,
           ),
           Icon(
-          Icons.person_2_outlined,
-          color: Colors.white,
+            Icons.favorite_outline,
+            color: Colors.white,
+          ),
+          Icon(
+            Icons.person_2_outlined,
+            color: Colors.white,
           ),
         ]),
         body: pages[currentTabIndex],

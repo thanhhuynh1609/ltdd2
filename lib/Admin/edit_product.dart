@@ -30,22 +30,76 @@ class _EditProductState extends State<EditProduct> {
   TextEditingController nameController = TextEditingController();
   TextEditingController priceController = TextEditingController();
   TextEditingController detailController = TextEditingController();
-  String selectedCategory = "Watch";
+  String? selectedCategoryId;
+  String? selectedCategoryName;
   
-  List<String> categories = ["Watch", "Laptop", "TV", "Headphones"];
+  List<Map<String, dynamic>> categories = [];
   bool isLoading = false;
+  bool isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
-    loadProductData();
+    loadCategories();
+  }
+
+  // Tải danh sách danh mục từ Firestore
+  Future<void> loadCategories() async {
+    setState(() {
+      isLoadingCategories = true;
+    });
+    
+    try {
+      final categoriesStream = await DatabaseMethods().getAllCategories();
+      categoriesStream.listen((snapshot) {
+        List<Map<String, dynamic>> loadedCategories = [];
+        
+        for (var doc in snapshot.docs) {
+          try {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            if (data.containsKey('name')) {
+              data['id'] = doc.id; // Lưu ID của document
+              loadedCategories.add(data);
+            }
+          } catch (e) {
+            print("Error processing category document: $e");
+          }
+        }
+        
+        setState(() {
+          categories = loadedCategories;
+          isLoadingCategories = false;
+          loadProductData(); // Tải dữ liệu sản phẩm sau khi đã tải danh mục
+        });
+      });
+    } catch (e) {
+      print("Error loading categories: $e");
+      setState(() {
+        isLoadingCategories = false;
+        loadProductData(); // Vẫn tải dữ liệu sản phẩm ngay cả khi có lỗi
+      });
+    }
   }
 
   void loadProductData() {
     nameController.text = widget.productData["Name"] ?? "";
     priceController.text = widget.productData["Price"] ?? "";
     detailController.text = widget.productData["Detail"] ?? "";
-    selectedCategory = widget.productData["Category"] ?? "Watch";
+    
+    // Lấy thông tin danh mục
+    selectedCategoryName = widget.productData["Category"];
+    selectedCategoryId = widget.productData["CategoryId"];
+    
+    // Nếu không có CategoryId (sản phẩm cũ), tìm id dựa trên tên danh mục
+    if (selectedCategoryId == null && selectedCategoryName != null) {
+      for (var category in categories) {
+        if (category['name'] == selectedCategoryName) {
+          selectedCategoryId = category['id'];
+          break;
+        }
+      }
+    }
+    
     existingImage = widget.productData["Image"];
   }
 
@@ -63,9 +117,9 @@ class _EditProductState extends State<EditProduct> {
   }
 
   Future updateProduct() async {
-    if (nameController.text.isEmpty || priceController.text.isEmpty) {
+    if (nameController.text.isEmpty || priceController.text.isEmpty || selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text("Vui lòng điền đầy đủ thông tin sản phẩm"),
+        content: Text("Vui lòng điền đầy đủ thông tin sản phẩm và chọn danh mục"),
         backgroundColor: Colors.red,
       ));
       return;
@@ -87,14 +141,26 @@ class _EditProductState extends State<EditProduct> {
         imageBase64 = existingImage!;
       }
 
+      // Tìm tên danh mục từ ID
+      String categoryName = "";
+      for (var category in categories) {
+        if (category['id'] == selectedCategoryId) {
+          categoryName = category['name'] as String;
+          break;
+        }
+      }
+
       // Chuẩn bị dữ liệu cập nhật
       Map<String, dynamic> productData = {
         "Name": nameController.text,
         "Price": priceController.text,
         "Detail": detailController.text,
-        "Category": selectedCategory,
+        "Category": categoryName,
+        "CategoryId": selectedCategoryId,
         "Image": imageBase64,
-        "SearchKey": nameController.text.substring(0, 1).toUpperCase(),
+        "SearchKey": nameController.text.isNotEmpty 
+            ? nameController.text.substring(0, 1).toUpperCase() 
+            : "A",
         "UpdateName": nameController.text.toUpperCase(),
       };
 
@@ -102,7 +168,7 @@ class _EditProductState extends State<EditProduct> {
       await DatabaseMethods().updateProduct(widget.productId, productData);
 
       // Nếu thay đổi danh mục
-      if (widget.productData["Category"] != selectedCategory) {
+      if (widget.productData["Category"] != categoryName) {
         // Xóa từ danh mục cũ
         if (widget.productData["Category"] != null) {
           await DatabaseMethods().deleteProductFromCategory(
@@ -112,13 +178,13 @@ class _EditProductState extends State<EditProduct> {
         }
         
         // Thêm vào danh mục mới
-        await DatabaseMethods().addProduct(productData, selectedCategory);
+        await DatabaseMethods().addProduct(productData, categoryName);
       } else {
         // Cập nhật trong cùng danh mục
         try {
           await DatabaseMethods().updateProductInCategory(
             widget.productId,
-            selectedCategory,
+            categoryName,
             productData
           );
         } catch (e) {
@@ -151,101 +217,119 @@ class _EditProductState extends State<EditProduct> {
       appBar: AppBar(
         title: Text("Chỉnh sửa sản phẩm"),
       ),
-      body: isLoading 
+      body: isLoadingCategories
         ? Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Phần chọn ảnh
-                Center(
-                  child: GestureDetector(
-                    onTap: getImage,
-                    child: Container(
-                      width: 150,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(10),
+        : isLoading 
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Phần chọn ảnh
+                  Center(
+                    child: GestureDetector(
+                      onTap: getImage,
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: _buildImageWidget(),
                       ),
-                      child: _buildImageWidget(),
                     ),
                   ),
-                ),
-                SizedBox(height: 20),
-                
-                // Tên sản phẩm
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: "Tên sản phẩm",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                SizedBox(height: 16),
-                
-                // Giá sản phẩm
-                TextField(
-                  controller: priceController,
-                  decoration: InputDecoration(
-                    labelText: "Giá sản phẩm",
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                SizedBox(height: 16),
-                
-                // Chi tiết sản phẩm
-                TextField(
-                  controller: detailController,
-                  decoration: InputDecoration(
-                    labelText: "Chi tiết sản phẩm",
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 5,
-                ),
-                SizedBox(height: 16),
-                
-                // Danh mục sản phẩm
-                DropdownButtonFormField<String>(
-                  value: selectedCategory,
-                  decoration: InputDecoration(
-                    labelText: "Danh mục",
-                    border: OutlineInputBorder(),
-                  ),
-                  items: categories.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedCategory = value!;
-                    });
-                  },
-                ),
-                SizedBox(height: 24),
-                
-                // Nút cập nhật
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: updateProduct,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: Text(
-                      "Cập nhật sản phẩm",
-                      style: TextStyle(fontSize: 16, color: Colors.white),
+                  SizedBox(height: 20),
+                  
+                  // Tên sản phẩm
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: "Tên sản phẩm",
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(height: 16),
+                  
+                  // Giá sản phẩm
+                  TextField(
+                    controller: priceController,
+                    decoration: InputDecoration(
+                      labelText: "Giá sản phẩm",
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Chi tiết sản phẩm
+                  TextField(
+                    controller: detailController,
+                    decoration: InputDecoration(
+                      labelText: "Chi tiết sản phẩm",
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 5,
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Danh mục sản phẩm
+                  categories.isEmpty
+                    ? Center(
+                        child: Column(
+                          children: [
+                            Text("Không tìm thấy danh mục nào. Vui lòng thêm danh mục trước."),
+                            SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: loadCategories,
+                              child: Text("Làm mới danh mục"),
+                            ),
+                          ],
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: selectedCategoryId,
+                        decoration: InputDecoration(
+                          labelText: "Danh mục",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: categories.map((category) {
+                          String id = category['id'] as String;
+                          String name = category['name'] as String;
+                          
+                          return DropdownMenuItem<String>(
+                            value: id,
+                            child: Text(name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedCategoryId = value;
+                          });
+                        },
+                      ),
+                  SizedBox(height: 24),
+                  
+                  // Nút cập nhật
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: updateProduct,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(
+                        "Cập nhật sản phẩm",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
     );
   }
 
@@ -274,5 +358,3 @@ class _EditProductState extends State<EditProduct> {
     }
   }
 }
-
-

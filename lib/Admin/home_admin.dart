@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shopping_app/Admin/add_product.dart';
 import 'package:shopping_app/Admin/all_orders.dart';
+import 'package:shopping_app/Admin/manage_categories.dart';
 import 'package:shopping_app/Admin/manage_products.dart';
 import 'package:shopping_app/Admin/manage_users.dart';
 
@@ -45,6 +46,17 @@ class _HomeAdminState extends State<HomeAdmin> {
               onTap: () {
                 Navigator.push(context,
                     MaterialPageRoute(builder: (context) => ManageProducts()));
+              },
+            ),
+            SizedBox(height: 20.0),
+            
+            // Nút quản lý danh mục
+            _buildAdminButton(
+              icon: Icons.category,
+              title: "Quản lý danh mục",
+              onTap: () {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => ManageCategories()));
               },
             ),
             SizedBox(height: 20.0),

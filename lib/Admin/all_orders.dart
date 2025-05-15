@@ -126,7 +126,7 @@ Widget allOrders() {
                                   SizedBox(height: 10,), 
                                   GestureDetector(
                                     onTap: ()async{
-                                      await DatabaseMethods().UpdateStatus(ds.id);
+                                      await DatabaseMethods().updateStatus(ds.id);
                                       setState(() {
                                         
                                       });

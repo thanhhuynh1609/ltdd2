@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:random_string/random_string.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
 
@@ -16,7 +16,6 @@ class AddProduct extends StatefulWidget {
   State<AddProduct> createState() => _AddProductState();
 }
 
-
 class _AddProductState extends State<AddProduct> {
   final ImagePicker _picker = ImagePicker();
   File? selectedImage;
@@ -25,6 +24,56 @@ class _AddProductState extends State<AddProduct> {
   TextEditingController priceController = TextEditingController();
   TextEditingController detailController = TextEditingController();
   bool isLoading = false;
+  
+  // Danh sách danh mục từ Firestore
+  List<Map<String, dynamic>> categories = [];
+  bool isLoadingCategories = true;
+  
+  // Khai báo biến selectedCategoryId rõ ràng
+  String? selectedCategoryId;
+  
+  @override
+  void initState() {
+    super.initState();
+    loadCategories();
+  }
+  
+  // Tải danh sách danh mục từ Firestore
+  Future<void> loadCategories() async {
+    setState(() {
+      isLoadingCategories = true;
+    });
+    
+    try {
+      final categoriesStream = await DatabaseMethods().getAllCategories();
+      categoriesStream.listen((snapshot) {
+        List<Map<String, dynamic>> loadedCategories = [];
+        
+        for (var doc in snapshot.docs) {
+          try {
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+            // Đảm bảo document có trường 'name'
+            if (data.containsKey('name')) {
+              data['id'] = doc.id; // Lưu ID của document
+              loadedCategories.add(data);
+            }
+          } catch (e) {
+            print("Error processing category document: $e");
+          }
+        }
+        
+        setState(() {
+          categories = loadedCategories;
+          isLoadingCategories = false;
+        });
+      });
+    } catch (e) {
+      print("Error loading categories: $e");
+      setState(() {
+        isLoadingCategories = false;
+      });
+    }
+  }
 
   // Chọn ảnh từ thư viện
   Future<void> getImage() async {
@@ -49,7 +98,7 @@ class _AddProductState extends State<AddProduct> {
   Future<void> uploadItem() async {
     if ((selectedImage != null || selectedImageBytes != null) &&
         nameController.text.isNotEmpty &&
-        value != null) {  // Kiểm tra value có null không
+        selectedCategoryId != null) {  // Sử dụng selectedCategoryId thay vì value
       
       // Hiển thị loading
       setState(() {
@@ -76,7 +125,18 @@ class _AddProductState extends State<AddProduct> {
           return;
         }
         
-        String firstletter = nameController.text.substring(0,1).toUpperCase();
+        String firstletter = nameController.text.isNotEmpty 
+            ? nameController.text.substring(0, 1).toUpperCase() 
+            : "A";
+        
+        // Tìm tên danh mục từ ID
+        String categoryName = "";
+        for (var category in categories) {
+          if (category['id'] == selectedCategoryId) {
+            categoryName = category['name'] as String;
+            break;
+          }
+        }
         
         // Thêm sản phẩm vào cơ sở dữ liệu
         Map<String, dynamic> addProduct = {
@@ -86,11 +146,12 @@ class _AddProductState extends State<AddProduct> {
           "UpdateName": nameController.text.toUpperCase(),
           "Price": priceController.text,
           "Detail": detailController.text,
-          "Category": value,
+          "Category": categoryName,
+          "CategoryId": selectedCategoryId,
         };
 
         // Thêm vào collection danh mục
-        await DatabaseMethods().addProduct(addProduct, value!);
+        await DatabaseMethods().addProduct(addProduct, categoryName);
         
         // Thêm vào collection Products
         await DatabaseMethods().addAllProducts(addProduct);
@@ -102,7 +163,7 @@ class _AddProductState extends State<AddProduct> {
           nameController.clear();
           priceController.clear();
           detailController.clear();
-          // Không reset value để người dùng có thể tiếp tục thêm sản phẩm cùng danh mục
+          // Không reset selectedCategoryId để người dùng có thể tiếp tục thêm sản phẩm cùng danh mục
         });
         
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -136,9 +197,6 @@ class _AddProductState extends State<AddProduct> {
     }
   }
 
-  String? value;
-  final List<String> categoryItems = ['Watch', 'Laptop', 'TV', 'Headphones'];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,7 +212,9 @@ class _AddProductState extends State<AddProduct> {
           style: AppWidget.semiboldTextFeildStyle(),
         ),
       ),
-      body: SingleChildScrollView(
+      body: isLoading 
+        ? Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
         padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,6 +273,7 @@ class _AddProductState extends State<AddProduct> {
               ),
               child: TextField(
                 controller: priceController,
+                keyboardType: TextInputType.number,
                 decoration: InputDecoration(border: InputBorder.none),
               ),
             ),
@@ -235,30 +296,56 @@ class _AddProductState extends State<AddProduct> {
             SizedBox(height: 20),
             Text("Product Category", style: AppWidget.lightTextFeildStyle()),
             SizedBox(height: 20),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: Color(0xffececf8),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  items: categoryItems
-                      .map((item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item,
-                                style: AppWidget.semiboldTextFeildStyle()),
-                          ))
-                      .toList(),
-                  onChanged: (value) => setState(() => this.value = value),
-                  dropdownColor: Colors.white,
-                  hint: Text("Select Category"),
-                  iconSize: 36,
-                  icon: Icon(Icons.arrow_drop_down, color: Colors.black),
-                  value: value,
+            isLoadingCategories
+              ? Center(child: CircularProgressIndicator())
+              : categories.isEmpty
+                ? Center(
+                    child: Column(
+                      children: [
+                        Text("No categories found. Please add categories first."),
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: loadCategories,
+                          child: Text("Refresh Categories"),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Color(0xffececf8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      items: categories.map((category) {
+                        // Đảm bảo category['id'] và category['name'] không null
+                        String id = category['id'] as String;
+                        String name = category['name'] as String;
+                        
+                        return DropdownMenuItem<String>(
+                          value: id,
+                          child: Text(
+                            name,
+                            style: AppWidget.semiboldTextFeildStyle(),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        setState(() {
+                          selectedCategoryId = newValue;
+                        });
+                      },
+                      dropdownColor: Colors.white,
+                      hint: Text("Select Category"),
+                      iconSize: 36,
+                      icon: Icon(Icons.arrow_drop_down, color: Colors.black),
+                      value: selectedCategoryId,
+                      isExpanded: true,
+                    ),
+                  ),
                 ),
-              ),
-            ),
             SizedBox(height: 30),
             Center(
               child: ElevatedButton(
@@ -272,178 +359,3 @@ class _AddProductState extends State<AddProduct> {
     );
   }
 }
-
-
-
-
-
-
-
-
-// import 'dart:io';
-
-// import 'package:firebase_storage/firebase_storage.dart';
-// import 'package:flutter/material.dart';
-// import 'package:image_picker/image_picker.dart';
-// import 'package:random_string/random_string.dart';
-// import 'package:shopping_app/pages/widget/support_widget.dart';
-// import 'package:shopping_app/services/database.dart';
-
-// class AddProduct extends StatefulWidget {
-//   const AddProduct({super.key});
-
-//   @override
-//   State<AddProduct> createState() => _AddProductState();
-// }
-
-// class _AddProductState extends State<AddProduct> {
-// final ImagePicker _picker = new ImagePicker();
-// File? selectedImage;
-// TextEditingController namecontroller = new TextEditingController();
-
-// Future getImage()async{
-//   var image = await _picker.pickImage(source: ImageSource.gallery);
-//   selectedImage= File(image!.path);
-//   setState(() {
-    
-//   });
-// }
-
-// uploadItem()async{
-//   if(selectedImage!=null && namecontroller.text!=""){
-//     String addId = randomAlphaNumeric(10);
-//     Reference firebaseStorageRef = FirebaseStorage.instance.ref().child("blogImage").child(addId);
-
-//     final UploadTask task = firebaseStorageRef.putFile(selectedImage!);
-//     var dowloadUrl = await (await task).ref.getDownloadURL();
-
-//     Map<String, dynamic> addProduct={
-//       "Name": namecontroller.text,
-//       "Image": dowloadUrl,
-
-//     };
-//     await DatabaseMethods().addProduct(addProduct, value!).then((value){
-//       selectedImage=null;
-//       namecontroller.text="";
-//       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-//         backgroundColor: Colors.redAccent,
-//         content: Text("Product has been uploaded Success", style: TextStyle(fontSize: 20),)));
-//     });
-//       }
-// }
-
-//   String? value;
-//   final List<String> categoryitem = ['Watch', 'Laptop', 'TV', 'Headphones'];
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         leading: GestureDetector(
-//             onTap: () {
-//               Navigator.pop(context);
-//             },
-//             child: Icon(Icons.arrow_back_ios_new_outlined)),
-//         title: Text(
-//           "Add Product",
-//           style: AppWidget.semiboldTextFeildStyle(),
-//         ),
-//       ),
-//       body: Container(
-//         margin: EdgeInsets.only(left: 20, top: 20, right: 20),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Text(
-//               "Upload the Product Image",
-//               style: AppWidget.lightTextFeildStyle(),
-//             ),
-//             SizedBox(
-//               height: 20,
-//             ),
-//            selectedImage==null? GestureDetector(
-//               onTap: (){
-//                 getImage();
-//               },
-//               child: Center(
-//                 child: Container(
-//                   height: 150,
-//                   width: 150,
-//                   decoration: BoxDecoration(
-//                       border: Border.all(color: Colors.black, width: 1.5),
-//                       borderRadius: BorderRadius.circular(20)),
-//                   child: Icon(Icons.camera_alt_outlined),
-//                 ),
-//               ),
-//             ): Material(
-//               borderRadius: BorderRadius.circular(20),
-//               child: Container(
-//                   height: 150,
-//                   width: 150,
-//                   decoration: BoxDecoration(
-//                       border: Border.all(color: Colors.black, width: 1.5),
-//                       borderRadius: BorderRadius.circular(20)),
-//                   child: Image.file(selectedImage!, fit: BoxFit.cover,)
-//                 ),
-//             ),
-//             SizedBox(
-//               height: 20,
-//             ),
-//             Text(
-//               "Product Name",
-//               style: AppWidget.lightTextFeildStyle(),
-//             ),
-//             SizedBox(
-//               height: 20,
-//             ),
-//             Container(
-//               padding: EdgeInsets.symmetric(horizontal: 20),
-//               width: MediaQuery.of(context).size.width,
-//               decoration: BoxDecoration(
-//                   color: Color(0xffececf8),
-//                   borderRadius: BorderRadius.circular(20)),
-//               child: TextField(
-//                 controller: namecontroller,
-//                 decoration: InputDecoration(border: InputBorder.none),
-//               ),
-//             ),
-//             SizedBox(height: 20,),
-//             Text(
-//               "Product Category",
-//               style: AppWidget.lightTextFeildStyle(),
-//             ),
-//             SizedBox(height: 20,),
-//             Container(
-//                 padding: EdgeInsets.symmetric(horizontal: 10),
-//                 width: MediaQuery.of(context).size.width,
-//                 decoration: BoxDecoration(
-//                     color: Color(0xffececf8),
-//                     borderRadius: BorderRadius.circular(10)),
-//                 child: DropdownButtonHideUnderline(
-//                   child: DropdownButton<String>(
-//                     items: categoryitem
-//                         .map((item) => DropdownMenuItem(
-//                             value: item,
-//                             child: Text(
-//                               item,
-//                               style: AppWidget.semiboldTextFeildStyle(),
-//                             )))
-//                         .toList(),
-//                     onChanged: ((value) => setState(() {
-//                           this.value = value;
-//                         })),
-//                         dropdownColor: Colors.white,
-//                         hint: Text("Select Category"),
-//                         iconSize: 36,
-//                         icon: Icon(Icons.arrow_drop_down, color: Colors.black,),
-//                                 value: value,  ),
-//                 )),
-//                 SizedBox(height: 30,),
-//                 Center(child: ElevatedButton(onPressed: (){
-//                   uploadItem();
-//                 }, child: Text("Add Product", style: TextStyle(fontSize: 22),)))
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }

@@ -1,48 +1,57 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-class SharedPreferenceHelper{
+class SharedPreferenceHelper {
   
-  static String userIdkey="USERKEY";
-  static String userNameIdkey="USERNAMEKEY";
-  static String userEmailIdkey="USEREMAILKEY";
-  static String userImageIdkey="USERIMAGEKEY";
+  static String userIdkey = "USERKEY";
+  static String userNameIdkey = "USERNAMEKEY";
+  static String userEmailIdkey = "USEREMAILKEY";
+  static String userImageIdkey = "USERIMAGEKEY";
 
-
-  Future<bool> saveUserId(String getUserId) async{
+  // Phương thức lưu userId
+  Future<bool> saveUserId(String userId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.setString(userIdkey, getUserId);
+    return prefs.setString(userIdkey, userId);
   }
-  Future<bool> saveUserName(String getUserName) async{
+
+  // Phương thức lưu userName
+  Future<bool> saveUserName(String getUserName) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.setString(userNameIdkey, getUserName);
   }
-  Future<bool> saveUserEmail(String getUserEmail) async{
+
+  // Phương thức lưu userEmail
+  Future<bool> saveUserEmail(String getUserEmail) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.setString(userEmailIdkey, getUserEmail);
   }
-  Future<bool> saveUserImage(String getUserImage) async{
+
+  // Phương thức lưu userImage
+  Future<bool> saveUserImage(String getUserImage) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.setString(userImageIdkey, getUserImage);
   }
 
-  Future<String?> getUserId()async{
+  // Phương thức lấy userId
+  Future<String?> getUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString(userIdkey);
   }
 
-  Future<String?> getUserName()async{
+  // Phương thức lấy userName
+  Future<String?> getUserName() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString(userNameIdkey);
   }
 
-  Future<String?> getUserImage()async{
+  // Phương thức lấy userImage
+  Future<String?> getUserImage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString(userImageIdkey);
   }
 
-  Future<String?> getUserEmail()async{
+  // Phương thức lấy userEmail
+  Future<String?> getUserEmail() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString(userEmailIdkey);
   }
-
 }

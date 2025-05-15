@@ -41,13 +41,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCe99_w1H1qWznNGFVb1PnP3TiM7_C9ADw',
-    appId: '1:175331934322:web:e2fee7f1f41dfb4988c2eb',
-    messagingSenderId: '175331934322',
-    projectId: 'shopapp-6f934',
-    authDomain: 'shopapp-6f934.firebaseapp.com',
-    storageBucket: 'shopapp-6f934.firebasestorage.app',
-    measurementId: 'G-V3CWFMP2V9',
+    apiKey: 'AIzaSyCe99_w1H1qWznNGFVb1PnP3TiM7_C9ADw', // Thay thế YOUR_API_KEY bằng API key thực
+    appId: '1:175331934322:web:e2fee7f1f41dfb4988c2eb', // Thay thế YOUR_APP_ID bằng App ID thực
+    messagingSenderId: '175331934322', // Thay thế YOUR_MESSAGING_SENDER_ID
+    projectId: 'shopapp-6f934', // Thay thế YOUR_PROJECT_ID
+    authDomain: 'shopapp-6f934.firebaseapp.com', // Thay thế YOUR_AUTH_DOMAIN
+    storageBucket: 'shopapp-6f934.firebasestorage.app', // Thay thế YOUR_STORAGE_BUCKET
+    measurementId: 'G-6LQ01L08T1', // Thay thế YOUR_MEASUREMENT_ID
   );
 
   static const FirebaseOptions android = FirebaseOptions(

@@ -24,6 +24,10 @@ class DatabaseMethods {
 
   // Thêm tất cả sản phẩm vào collection "Products"
   Future addAllProducts(Map<String, dynamic> userInfoMap) async {
+    // Đảm bảo trường votes được khởi tạo
+    if (!userInfoMap.containsKey("votes")) {
+      userInfoMap["votes"] = 0;
+    }
     return await FirebaseFirestore.instance
         .collection("Products")
         .add(userInfoMap);
@@ -31,13 +35,17 @@ class DatabaseMethods {
 
   // Thêm sản phẩm vào collection theo danh mục
   Future addProduct(Map<String, dynamic> userInfoMap, String categoryname) async {
+    // Đảm bảo trường votes được khởi tạo
+    if (!userInfoMap.containsKey("votes")) {
+      userInfoMap["votes"] = 0;
+    }
     return await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
   }
 
   // Cập nhật trạng thái đơn hàng
-  UpdateStatus(String id) async { // Sửa tên hàm thành "updateStatus" (viết thường chữ "u")
+  Future updateStatus(String id) async {
     return await FirebaseFirestore.instance
         .collection("Orders")
         .doc(id)
@@ -84,6 +92,11 @@ class DatabaseMethods {
   // Lấy tất cả sản phẩm
   Future<Stream<QuerySnapshot>> getAllProducts() async {
     return FirebaseFirestore.instance.collection("Products").snapshots();
+  }
+  
+  // Lấy snapshot của tất cả sản phẩm
+  Future<QuerySnapshot> getAllProductsSnapshot() async {
+    return await FirebaseFirestore.instance.collection("Products").get();
   }
 
   // Cập nhật sản phẩm
@@ -149,5 +162,180 @@ class DatabaseMethods {
         .collection("user")
         .doc(userId)
         .delete();
+  }
+  
+  // Thêm phương thức để cập nhật số lượt thích cho sản phẩm
+  Future<void> updateProductVotes(String productId, int votes) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("Products")
+          .doc(productId)
+          .update({"votes": votes});
+    } catch (e) {
+      print("Error updating product votes: $e");
+      throw e;
+    }
+  }
+
+  // Thêm phương thức để thêm/xóa sản phẩm yêu thích của người dùng
+  Future toggleFavoriteProduct(String userId, String productId, bool isFavorite) async {
+    if (isFavorite) {
+      // Thêm vào danh sách yêu thích
+      return await FirebaseFirestore.instance
+          .collection("user")
+          .doc(userId)
+          .collection("favorites")
+          .doc(productId)
+          .set({"timestamp": FieldValue.serverTimestamp()});
+    } else {
+      // Xóa khỏi danh sách yêu thích
+      return await FirebaseFirestore.instance
+          .collection("user")
+          .doc(userId)
+          .collection("favorites")
+          .doc(productId)
+          .delete();
+    }
+  }
+
+  // Kiểm tra xem sản phẩm có trong danh sách yêu thích không
+  Future<bool> isProductFavorite(String userId, String productId) async {
+    DocumentSnapshot doc = await FirebaseFirestore.instance
+        .collection("user")
+        .doc(userId)
+        .collection("favorites")
+        .doc(productId)
+        .get();
+    
+    return doc.exists;
+  }
+
+  Future<Stream<QuerySnapshot>> getUserFavorites(String userId) async {
+    return FirebaseFirestore.instance
+        .collection("user")
+        .doc(userId)
+        .collection("favorites")
+        .snapshots();
+  }
+
+  // Thêm phương thức để lấy tất cả danh mục
+  Future<Stream<QuerySnapshot>> getAllCategories() async {
+    return FirebaseFirestore.instance.collection("Categories").snapshots();
+  }
+
+  // Thêm phương thức để xóa danh mục
+  Future<void> deleteCategory(String categoryId) async {
+    return await FirebaseFirestore.instance
+        .collection("Categories")
+        .doc(categoryId)
+        .delete();
+  }
+
+  // Thêm phương thức để cập nhật danh mục
+  Future<void> updateCategory(String categoryId, Map<String, dynamic> data) async {
+    return await FirebaseFirestore.instance
+        .collection("Categories")
+        .doc(categoryId)
+        .update(data);
+  }
+
+    // Thêm phương thức để thêm danh mục mới
+  Future<DocumentReference> addCategory(Map<String, dynamic> data) async {
+    return await FirebaseFirestore.instance
+        .collection("Categories")
+        .add(data);
+  }
+
+    // Thêm phương thức để xóa sản phẩm từ danh mục
+  Future<void> removeProductFromCategoryCollection(String productId, String category) async {
+    // Tìm document ID trong collection category
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection(category)
+        .where("ProductId", isEqualTo: productId)
+        .get();
+    
+    if (snapshot.docs.isNotEmpty) {
+      for (var doc in snapshot.docs) {
+        await FirebaseFirestore.instance
+            .collection(category)
+            .doc(doc.id)
+            .delete();
+      }
+    }
+  }
+
+  // Thêm phương thức để lấy sản phẩm được yêu thích nhiều nhất
+  Future<QuerySnapshot> getMostFavoriteProducts(int limit) async {
+    return await FirebaseFirestore.instance
+        .collection("Products")
+        .orderBy("votes", descending: true)
+        .limit(limit)
+        .get();
+  }
+
+  // Thêm các phương thức cho chức năng yêu thích
+  Future<void> updateFavoriteStatus(String userId, String productId, bool isFavorite) async {
+    try {
+      if (isFavorite) {
+        // Thêm vào danh sách yêu thích
+        await FirebaseFirestore.instance
+            .collection("user")
+            .doc(userId)
+            .collection("favorites")
+            .doc(productId)
+            .set({
+          "timestamp": FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Xóa khỏi danh sách yêu thích
+        await FirebaseFirestore.instance
+            .collection("user")
+            .doc(userId)
+            .collection("favorites")
+            .doc(productId)
+            .delete();
+      }
+    } catch (e) {
+      print("Error toggling favorite: $e");
+      throw e;
+    }
+  }
+
+  // Cập nhật số lượt thích của sản phẩm
+    Future<void> updateProductVoteCount(String productId, int votes) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("Products")
+          .doc(productId)
+          .update({"votes": votes});
+    } catch (e) {
+      print("Error updating product votes: $e");
+      throw e;
+    }
+  }
+
+  // Kiểm tra xem sản phẩm có được yêu thích bởi người dùng không
+  Future<bool> isProductFavorited(String userId, String productId) async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection("user")
+          .doc(userId)
+          .collection("favorites")
+          .doc(productId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print("Error checking if product is favorited: $e");
+      return false;
+    }
+  }
+
+  // Lấy danh sách sản phẩm yêu thích của người dùng
+    Future<Stream<QuerySnapshot>> getFavoriteProducts(String userId) async {
+    return FirebaseFirestore.instance
+        .collection("user")
+        .doc(userId)
+        .collection("favorites")
+        .snapshots();
   }
 }
