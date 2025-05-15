@@ -167,10 +167,38 @@ class DatabaseMethods {
   // Thêm phương thức để cập nhật số lượt thích cho sản phẩm
   Future<void> updateProductVotes(String productId, int votes) async {
     try {
+      // Cập nhật trong collection Products
       await FirebaseFirestore.instance
           .collection("Products")
           .doc(productId)
           .update({"votes": votes});
+      
+      // Cập nhật trong tất cả các document yêu thích của người dùng
+      QuerySnapshot userSnapshot = await FirebaseFirestore.instance
+          .collection("user")
+          .get();
+      
+      for (var userDoc in userSnapshot.docs) {
+        String userId = userDoc.id;
+        
+        // Kiểm tra xem người dùng có yêu thích sản phẩm này không
+        DocumentSnapshot favoriteDoc = await FirebaseFirestore.instance
+            .collection("user")
+            .doc(userId)
+            .collection("favorites")
+            .doc(productId)
+            .get();
+        
+        if (favoriteDoc.exists) {
+          // Cập nhật votes trong document yêu thích
+          await FirebaseFirestore.instance
+              .collection("user")
+              .doc(userId)
+              .collection("favorites")
+              .doc(productId)
+              .update({"votes": votes});
+        }
+      }
     } catch (e) {
       print("Error updating product votes: $e");
       throw e;
@@ -178,23 +206,58 @@ class DatabaseMethods {
   }
 
   // Thêm phương thức để thêm/xóa sản phẩm yêu thích của người dùng
-  Future toggleFavoriteProduct(String userId, String productId, bool isFavorite) async {
-    if (isFavorite) {
-      // Thêm vào danh sách yêu thích
-      return await FirebaseFirestore.instance
-          .collection("user")
-          .doc(userId)
-          .collection("favorites")
-          .doc(productId)
-          .set({"timestamp": FieldValue.serverTimestamp()});
-    } else {
-      // Xóa khỏi danh sách yêu thích
-      return await FirebaseFirestore.instance
-          .collection("user")
-          .doc(userId)
-          .collection("favorites")
-          .doc(productId)
-          .delete();
+  Future<bool> toggleFavoriteProduct(String userId, String productId, bool isFavorite) async {
+    try {
+      print("Toggling favorite for user: $userId, product: $productId, isFavorite: $isFavorite");
+      
+      if (isFavorite) {
+        // Lấy thông tin sản phẩm từ collection Products
+        DocumentSnapshot productSnapshot = await FirebaseFirestore.instance
+            .collection("Products")
+            .doc(productId)
+            .get();
+        
+        if (productSnapshot.exists) {
+          // Lấy dữ liệu sản phẩm
+          Map<String, dynamic> productData = productSnapshot.data() as Map<String, dynamic>;
+          
+          // Thêm vào danh sách yêu thích với đầy đủ thông tin
+          await FirebaseFirestore.instance
+              .collection("user")
+              .doc(userId)
+              .collection("favorites")
+              .doc(productId)
+              .set({
+                "timestamp": FieldValue.serverTimestamp(),
+                "Name": productData["Name"] ?? "Unknown",
+                "Price": productData["Price"] ?? "0.00",
+                "Image": productData["Image"] ?? "",
+                "Detail": productData["Detail"] ?? "",
+                "Category": productData["Category"] ?? "",
+                "votes": productData["votes"] ?? 0,
+              });
+          
+          print("Added to favorites with full product data");
+        } else {
+          print("Product does not exist");
+          return false;
+        }
+      } else {
+        // Xóa khỏi danh sách yêu thích
+        await FirebaseFirestore.instance
+            .collection("user")
+            .doc(userId)
+            .collection("favorites")
+            .doc(productId)
+            .delete();
+        
+        print("Removed from favorites");
+      }
+      
+      return true;
+    } catch (e) {
+      print("Error toggling favorite: $e");
+      return false;
     }
   }
 

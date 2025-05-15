@@ -154,21 +154,29 @@ class _ProductDetailState extends State<ProductDetail> {
     // Giải mã base64 từ chuỗi hình ảnh với xử lý lỗi
     Widget imageWidget;
     try {
-      String base64Image = widget.image;
-      Uint8List bytes = base64Decode(base64Image);
-      imageWidget = Image.memory(
-        bytes,
-        height: 400,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print("Error loading image: $error");
-          return Container(
-            height: 400,
-            color: Colors.grey[300],
-            child: Icon(Icons.image_not_supported, size: 100, color: Colors.grey[600]),
-          );
-        },
-      );
+      if (widget.image != null && widget.image.isNotEmpty) {
+        Uint8List bytes = base64Decode(widget.image);
+        imageWidget = Image.memory(
+          bytes,
+          height: 400,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print("Error loading image: $error");
+            return Container(
+              height: 400,
+              color: Colors.grey[300],
+              child: Icon(Icons.image_not_supported, size: 100, color: Colors.grey[600]),
+            );
+          },
+        );
+      } else {
+        imageWidget = Container(
+          height: 400,
+          color: Colors.grey[300],
+          child: Icon(Icons.image_not_supported, size: 100, color: Colors.grey[600]),
+        );
+      }
     } catch (e) {
       print("Error decoding image: $e");
       imageWidget = Container(
@@ -177,7 +185,7 @@ class _ProductDetailState extends State<ProductDetail> {
         child: Icon(Icons.broken_image, size: 100, color: Colors.grey[600]),
       );
     }
-
+    
     return Scaffold(
       backgroundColor: Color(0xfffef5f1),
       body: Container(

@@ -34,38 +34,85 @@ class _FavoriteProductsState extends State<FavoriteProducts> {
   }
 
   Future<void> loadFavoriteProducts() async {
+    setState(() {
+      isLoading = true;
+    });
+    
     try {
-      // Lấy danh sách ID sản phẩm yêu thích
+      print("Loading favorites for user: $userId");
+      
+      // Lấy danh sách sản phẩm yêu thích
       QuerySnapshot favoritesSnapshot = await FirebaseFirestore.instance
           .collection("user")
           .doc(userId)
           .collection("favorites")
           .get();
       
+      print("Found ${favoritesSnapshot.docs.length} favorites");
+      
       // Lấy thông tin chi tiết của từng sản phẩm
-      favoriteProducts = [];
+      List<Map<String, dynamic>> products = [];
       for (var doc in favoritesSnapshot.docs) {
         String productId = doc.id;
+        print("Processing favorite product: $productId");
         
-        DocumentSnapshot productSnapshot = await FirebaseFirestore.instance
-            .collection("Products")
-            .doc(productId)
-            .get();
+        // Lấy dữ liệu từ document yêu thích
+        Map<String, dynamic> favoriteData = doc.data() as Map<String, dynamic>;
         
-        if (productSnapshot.exists) {
-          Map<String, dynamic> productData = 
-              productSnapshot.data() as Map<String, dynamic>;
+        // Kiểm tra xem dữ liệu sản phẩm đã được lưu trong document yêu thích chưa
+        if (favoriteData.containsKey("Name") && 
+            favoriteData.containsKey("Price") && 
+            favoriteData.containsKey("Image")) {
+          // Sử dụng dữ liệu từ document yêu thích
+          print("Using embedded product data for: $productId");
+          favoriteData['productId'] = productId;
+          products.add(favoriteData);
+        } else {
+          // Nếu không có dữ liệu đầy đủ, lấy từ collection Products
+          print("Fetching product data from Products collection for: $productId");
+          DocumentSnapshot productSnapshot = await FirebaseFirestore.instance
+              .collection("Products")
+              .doc(productId)
+              .get();
           
-          // Thêm productId vào dữ liệu
-          productData['productId'] = productId;
-          
-          favoriteProducts.add(productData);
+          if (productSnapshot.exists) {
+            print("Product exists: ${productSnapshot.id}");
+            Map<String, dynamic> productData = productSnapshot.data() as Map<String, dynamic>;
+            productData['productId'] = productId;
+            products.add(productData);
+            
+            // Cập nhật lại document yêu thích với dữ liệu đầy đủ
+            await FirebaseFirestore.instance
+                .collection("user")
+                .doc(userId)
+                .collection("favorites")
+                .doc(productId)
+                .set({
+                  "timestamp": FieldValue.serverTimestamp(),
+                  "Name": productData["Name"] ?? "Unknown",
+                  "Price": productData["Price"] ?? "0.00",
+                  "Image": productData["Image"] ?? "",
+                  "Detail": productData["Detail"] ?? "",
+                  "Category": productData["Category"] ?? "",
+                  "votes": productData["votes"] ?? 0,
+                });
+          } else {
+            print("Product does not exist: $productId");
+          }
         }
       }
       
-      setState(() {});
+      setState(() {
+        favoriteProducts = products;
+        isLoading = false;
+      });
+      
+      print("Loaded ${favoriteProducts.length} favorite products");
     } catch (e) {
       print("Error loading favorite products: $e");
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -88,23 +135,47 @@ class _FavoriteProductsState extends State<FavoriteProducts> {
                         Map<String, dynamic> product = favoriteProducts[index];
                         String productId = product['productId'] ?? '';
                         
+                        print("Rendering product: $productId");
+                        print("Product data: $product");
+                        
                         // Giải mã base64 từ Firestore nếu có
                         Widget productImage;
-                        if (product["Image"] != null) {
+                        if (product.containsKey("Image") && product["Image"] != null && product["Image"].toString().isNotEmpty) {
                           try {
+                            print("Decoding image for product: $productId");
                             Uint8List bytes = base64Decode(product["Image"]);
                             productImage = Image.memory(
                               bytes,
-                              width: 50,
-                              height: 50,
+                              width: 80,
+                              height: 80,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                print("Error displaying image: $error");
+                                return Container(
+                                  width: 80,
+                                  height: 80,
+                                  color: Colors.grey[300],
+                                  child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+                                );
+                              },
                             );
                           } catch (e) {
                             print("Error decoding image: $e");
-                            productImage = Icon(Icons.image, size: 50);
+                            productImage = Container(
+                              width: 80,
+                              height: 80,
+                              color: Colors.grey[300],
+                              child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+                            );
                           }
                         } else {
-                          productImage = Icon(Icons.image, size: 50);
+                          print("No image data for product: $productId");
+                          productImage = Container(
+                            width: 80,
+                            height: 80,
+                            color: Colors.grey[300],
+                            child: Icon(Icons.image_not_supported, color: Colors.grey[600]),
+                          );
                         }
                         
                         return Card(
@@ -117,15 +188,26 @@ class _FavoriteProductsState extends State<FavoriteProducts> {
                             trailing: IconButton(
                               icon: Icon(Icons.delete, color: Colors.red),
                               onPressed: () async {
-                                await FirebaseFirestore.instance
-                                    .collection("user")
-                                    .doc(userId)
-                                    .collection("favorites")
-                                    .doc(productId)
-                                    .delete();
-                                
-                                // Cập nhật UI sau khi xóa
-                                await loadFavoriteProducts();
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection("user")
+                                      .doc(userId)
+                                      .collection("favorites")
+                                      .doc(productId)
+                                      .delete();
+                                  
+                                  // Cập nhật UI sau khi xóa
+                                  await loadFavoriteProducts();
+                                  
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text("Đã xóa khỏi danh sách yêu thích"))
+                                  );
+                                } catch (e) {
+                                  print("Error removing favorite: $e");
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text("Lỗi khi xóa: $e"))
+                                  );
+                                }
                               },
                             ),
                             onTap: () {
@@ -138,7 +220,7 @@ class _FavoriteProductsState extends State<FavoriteProducts> {
                                     name: product["Name"] ?? "",
                                     price: product["Price"] ?? "",
                                     productId: productId,
-                                    votes: product["votes"] ?? 0,
+                                    votes: product["votes"] is int ? product["votes"] : 0,
                                   ),
                                 ),
                               ).then((_) => loadFavoriteProducts());
@@ -150,6 +232,11 @@ class _FavoriteProductsState extends State<FavoriteProducts> {
     );
   }
 }
+
+
+
+
+
 
 
 

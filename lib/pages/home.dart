@@ -632,6 +632,83 @@ class _HomeState extends State<Home> {
   }
   
   void loadMostFavoriteProducts() {}
+
+  Future<void> toggleFavorite(DocumentSnapshot product) async {
+    try {
+      String? userId = await SharedPreferenceHelper().getUserId();
+      if (userId != null) {
+        String productId = product.id;
+        
+        // Kiểm tra trạng thái yêu thích hiện tại
+        bool isFavorite = await isProductFavorite(userId, productId);
+        
+        // Lấy dữ liệu sản phẩm
+        Map<String, dynamic> productData = product.data() as Map<String, dynamic>;
+        
+        if (!isFavorite) {
+          // Thêm vào yêu thích với đầy đủ thông tin
+          await FirebaseFirestore.instance
+              .collection("user")
+              .doc(userId)
+              .collection("favorites")
+              .doc(productId)
+              .set({
+                "timestamp": FieldValue.serverTimestamp(),
+                "Name": productData["Name"] ?? "Unknown",
+                "Price": productData["Price"] ?? "0.00",
+                "Image": productData["Image"] ?? "",
+                "Detail": productData["Detail"] ?? "",
+                "Category": productData["Category"] ?? "",
+                "votes": productData["votes"] ?? 0,
+              });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Đã thêm vào danh sách yêu thích"))
+          );
+        } else {
+          // Xóa khỏi yêu thích
+          await FirebaseFirestore.instance
+              .collection("user")
+              .doc(userId)
+              .collection("favorites")
+              .doc(productId)
+              .delete();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Đã xóa khỏi danh sách yêu thích"))
+          );
+        }
+        
+        setState(() {});
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Vui lòng đăng nhập để thêm vào yêu thích"))
+        );
+      }
+    } catch (e) {
+      print("Lỗi khi thêm/xóa yêu thích: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Có lỗi xảy ra: $e"))
+      );
+    }
+  }
+
+  // Thêm phương thức này để kiểm tra trạng thái yêu thích
+  Future<bool> isProductFavorite(String userId, String productId) async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection("user")
+          .doc(userId)
+          .collection("favorites")
+          .doc(productId)
+          .get();
+      
+      return doc.exists;
+    } catch (e) {
+      print("Lỗi khi kiểm tra trạng thái yêu thích: $e");
+      return false;
+    }
+  }
 }
 
 class CategoryTile extends StatelessWidget {

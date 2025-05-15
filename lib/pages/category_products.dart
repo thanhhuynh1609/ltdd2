@@ -153,25 +153,34 @@ class _CategoryProductState extends State<CategoryProduct> {
                                     // Kiểm tra trạng thái yêu thích hiện tại
                                     bool isFavorite = await DatabaseMethods().isProductFavorite(userId, ds.id);
                                     
-                                    // Cập nhật trạng thái yêu thích trong database
-                                    await DatabaseMethods().toggleFavoriteProduct(userId, ds.id, !isFavorite);
+                                    // Lấy dữ liệu sản phẩm
+                                    Map<String, dynamic> productData = ds.data() as Map<String, dynamic>;
                                     
-                                    // Thêm trường votes vào sản phẩm nếu chưa có
-                                    try {
-                                      // Đầu tiên, thêm trường votes vào sản phẩm trong collection Products
+                                    // Cập nhật trạng thái yêu thích trong database
+                                    if (!isFavorite) {
+                                      // Thêm vào yêu thích với đầy đủ thông tin
                                       await FirebaseFirestore.instance
-                                          .collection("Products")
+                                          .collection("user")
+                                          .doc(userId)
+                                          .collection("favorites")
                                           .doc(ds.id)
-                                          .set({"votes": 0}, SetOptions(merge: true));
-                                          
-                                      // Sau đó cập nhật số lượt thích
-                                      int newVotes = !isFavorite ? 1 : 0;
+                                          .set({
+                                            "timestamp": FieldValue.serverTimestamp(),
+                                            "Name": productData["Name"] ?? "Unknown",
+                                            "Price": productData["Price"] ?? "0.00",
+                                            "Image": productData["Image"] ?? "",
+                                            "Detail": productData["Detail"] ?? "",
+                                            "Category": productData["Category"] ?? "",
+                                            "votes": productData["votes"] ?? 0,
+                                          });
+                                    } else {
+                                      // Xóa khỏi yêu thích
                                       await FirebaseFirestore.instance
-                                          .collection("Products")
+                                          .collection("user")
+                                          .doc(userId)
+                                          .collection("favorites")
                                           .doc(ds.id)
-                                          .update({"votes": newVotes});
-                                    } catch (e) {
-                                      print("Lỗi khi cập nhật votes: $e");
+                                          .delete();
                                     }
                                     
                                     // Hiển thị thông báo
