@@ -25,6 +25,10 @@ class DatabaseMethods {
 
   // Thêm tất cả sản phẩm vào collection "Products"
   Future addAllProducts(Map<String, dynamic> userInfoMap) async {
+    // Đảm bảo có trường SoldCount
+    if (!userInfoMap.containsKey("SoldCount")) {
+      userInfoMap["SoldCount"] = 0;
+    }
     return await FirebaseFirestore.instance
         .collection("Products")
         .add(userInfoMap);
@@ -33,6 +37,10 @@ class DatabaseMethods {
   // Thêm sản phẩm vào collection theo danh mục và trả về ID của document
   Future<String> addProduct(
       Map<String, dynamic> userInfoMap, String categoryname) async {
+    // Đảm bảo có trường SoldCount
+    if (!userInfoMap.containsKey("SoldCount")) {
+      userInfoMap["SoldCount"] = 0;
+    }
     DocumentReference docRef = await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
@@ -222,9 +230,41 @@ class DatabaseMethods {
       orderMap['CreatedAt'] = FieldValue.serverTimestamp();
 
       // Lưu đơn hàng vào Firestore
-      return await FirebaseFirestore.instance
+      DocumentReference orderRef = await FirebaseFirestore.instance
           .collection("Orders")
           .add(orderMap);
+      
+      // Cập nhật SoldCount cho mỗi sản phẩm trong đơn hàng
+      if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
+        List<dynamic> products = orderMap['Products'];
+        
+        for (var product in products) {
+          if (product is Map && product.containsKey('Name')) {
+            String productName = product['Name'];
+            int quantity = int.tryParse(product['Quantity']?.toString() ?? '1') ?? 1;
+            
+            // Tìm sản phẩm trong collection Products
+            QuerySnapshot productQuery = await FirebaseFirestore.instance
+                .collection("Products")
+                .where("Name", isEqualTo: productName)
+                .get();
+            
+            if (productQuery.docs.isNotEmpty) {
+              DocumentReference productRef = productQuery.docs.first.reference;
+              
+              // Lấy giá trị SoldCount hiện tại
+              int currentSoldCount = productQuery.docs.first.get("SoldCount") ?? 0;
+              
+              // Cập nhật SoldCount
+              await productRef.update({
+                "SoldCount": currentSoldCount + quantity
+              });
+            }
+          }
+        }
+      }
+      
+      return orderRef;
     } catch (e) {
       print("Lỗi khi tạo đơn hàng: $e");
       throw e;
@@ -393,6 +433,25 @@ class DatabaseMethods {
     } catch (e) {
       print("Lỗi khi thêm đánh giá: $e");
       throw e;
+    }
+  }
+
+  // Hàm tiện ích để cập nhật trường SoldCount cho tất cả sản phẩm
+  Future<void> updateAllProductsWithSoldCount() async {
+    try {
+      QuerySnapshot productsSnapshot = await FirebaseFirestore.instance
+          .collection("Products")
+          .get();
+      
+      for (var doc in productsSnapshot.docs) {
+        if (!doc.data().toString().contains('SoldCount')) {
+          await doc.reference.update({"SoldCount": 0});
+        }
+      }
+      
+      print("Đã cập nhật SoldCount cho tất cả sản phẩm");
+    } catch (e) {
+      print("Lỗi khi cập nhật SoldCount: $e");
     }
   }
 }
