@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shopping_app/pages/chat_page.dart';
+import 'package:shopping_app/services/chat_service.dart';
 import 'package:shopping_app/services/shared_pref.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shopping_app/pages/login.dart';
+import 'package:shopping_app/pages/wallet_page.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -14,6 +17,7 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   String? image, name, email, phone;
   bool isLoading = true;
+  String userId = "";
 
   getthesharedpref() async {
     setState(() {
@@ -24,6 +28,7 @@ class _ProfileState extends State<Profile> {
     name = await SharedPreferenceHelper().getUserName();
     email = await SharedPreferenceHelper().getUserEmail();
     phone = await SharedPreferenceHelper().getUserPhone();
+    userId = await SharedPreferenceHelper().getUserId() ?? "";
 
     setState(() {
       isLoading = false;
@@ -188,7 +193,7 @@ class _ProfileState extends State<Profile> {
                             backgroundColor: Colors.white,
                             backgroundImage: image != null && image!.isNotEmpty
                                 ? NetworkImage(image!)
-                                : AssetImage('images/boy.jpg') as ImageProvider,
+                                : AssetImage('images/user.png') as ImageProvider,
                           ),
                           SizedBox(height: 10),
                           Text(
@@ -248,6 +253,19 @@ class _ProfileState extends State<Profile> {
                           },
                         ),
 
+                        // Wallet
+                        SettingItem(
+                          icon: Icons.account_balance_wallet_outlined,
+                          title: "Ví của tôi",
+                          subtitle: "Quản lý và nạp tiền vào ví",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => WalletPage()),
+                            );
+                          },
+                        ),
+
                         // Bank Account
                         SettingItem(
                           icon: Icons.account_balance_outlined,
@@ -275,6 +293,88 @@ class _ProfileState extends State<Profile> {
                             // Navigate to security settings
                           },
                         ),
+                        StreamBuilder<int>(
+  stream: ChatService.getUnreadCount(userId, false),
+  builder: (context, snapshot) {
+    int unreadCount = snapshot.data ?? 0;
+
+    return SettingItem(
+      icon: Icons.chat,
+      title: "Chat với Admin",
+      subtitle: "Nhắn tin trao đổi với admin",
+      badgeCount: unreadCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ChatPage()),
+        );
+      },
+    );
+  },
+),
+
+
+                        // Chat with Admin
+                        // StreamBuilder<int>(
+                        //   stream: ChatService.getUnreadCount(userId, false),
+                        //   builder: (context, snapshot) {
+                        //     int unreadCount = snapshot.data ?? 0;
+                            
+                        //     return ListTile(
+                        //       leading: Container(
+                        //         padding: EdgeInsets.all(10),
+                        //         decoration: BoxDecoration(
+                        //           color: Colors.blue.withOpacity(0.1),
+                        //           borderRadius: BorderRadius.circular(10),
+                        //         ),
+                        //         child: Icon(
+                        //           Icons.chat,
+                        //           color: const Color.fromARGB(255, 86, 42, 233),
+                        //           size: 25,
+                        //         ),
+                        //       ),
+                        //       title: Text(
+                        //         "Chat với Admin",
+                        //         style: TextStyle(
+                        //           fontSize: 16,
+                        //           fontWeight: FontWeight.w500,
+                        //         ),
+                        //       ),
+                        //       trailing: Row(
+                        //         mainAxisSize: MainAxisSize.min,
+                        //         children: [
+                        //           if (unreadCount > 0)
+                        //             Container(
+                        //               padding: EdgeInsets.all(6),
+                        //               decoration: BoxDecoration(
+                        //                 color: Colors.red,
+                        //                 shape: BoxShape.circle,
+                        //               ),
+                        //               child: Text(
+                        //                 unreadCount.toString(),
+                        //                 style: TextStyle(
+                        //                   color: Colors.white,
+                        //                   fontSize: 12,
+                        //                   fontWeight: FontWeight.bold,
+                        //                 ),
+                        //               ),
+                        //             ),
+                        //           SizedBox(width: 8),
+                        //           Icon(
+                        //             Icons.arrow_forward_ios,
+                        //             size: 18,
+                        //           ),
+                        //         ],
+                        //       ),
+                        //       onTap: () {
+                        //         Navigator.push(
+                        //           context,
+                        //           MaterialPageRoute(builder: (context) => ChatPage()),
+                        //         );
+                        //       },
+                        //     );
+                        //   },
+                        // ),
 
                         SizedBox(height: 24),
 
@@ -341,11 +441,74 @@ class _ProfileState extends State<Profile> {
 }
 
 // Widget for Setting Items
+// class SettingItem extends StatelessWidget {
+//   final IconData icon;
+//   final String title;
+//   final String subtitle;
+//   final VoidCallback onTap;
+
+//   const SettingItem({
+//     Key? key,
+//     required this.icon,
+//     required this.title,
+//     required this.subtitle,
+//     required this.onTap,
+//   }) : super(key: key);
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return InkWell(
+//       onTap: onTap,
+//       child: Padding(
+//         padding: const EdgeInsets.symmetric(vertical: 12.0),
+//         child: Row(
+//           children: [
+//             Container(
+//               padding: EdgeInsets.all(10),
+//               decoration: BoxDecoration(
+//                 color: Colors.grey.shade100,
+//                 borderRadius: BorderRadius.circular(10),
+//               ),
+//               child: Icon(icon, color: Color(0xFF4A5CFF), size: 24),
+//             ),
+//             SizedBox(width: 16),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     title,
+//                     style: TextStyle(
+//                       fontSize: 16,
+//                       fontWeight: FontWeight.w500,
+//                     ),
+//                   ),
+//                   SizedBox(height: 4),
+//                   Text(
+//                     subtitle,
+//                     style: TextStyle(
+//                       fontSize: 14,
+//                       color: Colors.grey.shade600,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+
 class SettingItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final int? badgeCount; // thêm biến này
 
   const SettingItem({
     Key? key,
@@ -353,6 +516,7 @@ class SettingItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.badgeCount,
   }) : super(key: key);
 
   @override
@@ -394,6 +558,25 @@ class SettingItem extends StatelessWidget {
                 ],
               ),
             ),
+            // Badge nếu có
+            if (badgeCount != null && badgeCount! > 0)
+              Container(
+                padding: EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  badgeCount.toString(),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            if (badgeCount != null && badgeCount! > 0)
+              SizedBox(width: 8),
             Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
           ],
         ),
@@ -401,6 +584,7 @@ class SettingItem extends StatelessWidget {
     );
   }
 }
+
 
 // Widget for Setting Items with Switch
 class SettingItemSwitch extends StatelessWidget {
@@ -641,7 +825,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           backgroundImage: _imageUrl != null &&
                                   _imageUrl!.isNotEmpty
                               ? NetworkImage(_imageUrl!)
-                              : AssetImage('images/boy.jpg') as ImageProvider,
+                              : AssetImage('images/user.png') as ImageProvider,
                         ),
                         Positioned(
                           bottom: 0,

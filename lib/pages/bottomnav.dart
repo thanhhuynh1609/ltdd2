@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/Order.dart';
 import 'package:shopping_app/pages/home.dart';
 import 'package:shopping_app/pages/profile.dart';
+import 'package:shopping_app/services/notification_service.dart';
+import 'package:shopping_app/services/shared_pref.dart';
+import 'package:shopping_app/pages/notifications_page.dart';
 
 class Bottomnav extends StatefulWidget {
   const Bottomnav({super.key});
@@ -18,15 +21,24 @@ class _BottomnavState extends State<Bottomnav> {
   late Order order;
   late Profile profile;
   int currentTabIndex=0;
+  String userId = "";
+  int unreadNotifications = 0;
 
   @override
   void initState() {
+    super.initState();
+    _getUserId();
     HomePage= Home();
     order = Order();
     profile = Profile();
     pages = [HomePage, order, profile];
-    super.initState();
   }
+
+  Future<void> _getUserId() async {
+    userId = await SharedPreferenceHelper().getUserId() ?? "";
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

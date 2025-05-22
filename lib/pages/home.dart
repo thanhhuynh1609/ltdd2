@@ -3,8 +3,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shopping_app/pages/category_products.dart';
 import 'package:shopping_app/pages/cart_page.dart';
+import 'package:shopping_app/pages/notifications_page.dart';
 import 'package:shopping_app/pages/widget/support_widget.dart';
 import 'package:shopping_app/services/database.dart';
+import 'package:shopping_app/services/notification_service.dart';
 import 'package:shopping_app/services/shared_pref.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -20,6 +22,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   bool search = false;
+  String userId = ""; // Thêm biến userId
 
   List categories = [
     "images/headphoneicon.png",
@@ -38,34 +41,83 @@ class _HomeState extends State<Home> {
   var queryResultSet = [];
   var tempSearchStore = [];
 
-  initiateSearch(value) {
+  Stream? bestSellingStream;
+
+  getBestSellingProducts() async {
+    bestSellingStream = FirebaseFirestore.instance
+        .collection("Products")
+        .orderBy("SoldCount", descending: true)
+        .limit(6)
+        .snapshots();
+    setState(() {});
+  }
+
+  initiateSearch(value) async {
     if (value.length == 0) {
       setState(() {
         queryResultSet = [];
         tempSearchStore = [];
+        search = false;
       });
+      return;
     }
+    
     setState(() {
       search = true;
     });
 
-    var CapitalizedValue =
-        value.substring(0, 1).toUpperCase() + value.substring(1);
-    if (queryResultSet.isEmpty && value.length == 1) {
-      DatabaseMethods().search(value).then((QuerySnapshot docs) {
-        for (int i = 0; i < docs.docs.length; ++i) {
-          queryResultSet.add(docs.docs[i].data());
+    // Chuyển đổi giá trị tìm kiếm thành chữ hoa để so sánh không phân biệt hoa thường
+    String searchValue = value.toUpperCase();
+    
+    if (value.length == 1) {
+      // Tìm kiếm ban đầu khi người dùng nhập ký tự đầu tiên
+      queryResultSet = [];
+      QuerySnapshot snapshot = await DatabaseMethods().search(value);
+      
+      setState(() {
+        for (var doc in snapshot.docs) {
+          queryResultSet.add(doc.data());
+        }
+        
+        // Lọc kết quả ngay lập tức
+        tempSearchStore = queryResultSet.where((element) {
+          return element['UpdateName'].toString().contains(searchValue);
+        }).toList();
+      });
+    } else if (value.length > 1) {
+      // Tìm kiếm trong kết quả đã có
+      setState(() {
+        tempSearchStore = queryResultSet.where((element) {
+          return element['UpdateName'].toString().contains(searchValue);
+        }).toList();
+        
+        // Nếu không có kết quả, thử tìm kiếm nâng cao
+        if (tempSearchStore.isEmpty && queryResultSet.isNotEmpty) {
+          // Tìm kiếm với điều kiện ít nghiêm ngặt hơn
+          tempSearchStore = queryResultSet.where((element) {
+            String name = element['Name']?.toString().toUpperCase() ?? '';
+            return name.contains(searchValue);
+          }).toList();
         }
       });
-    } else {
-      tempSearchStore = [];
-      queryResultSet.forEach((element) {
-        if (element['UpdateName'].startsWith(CapitalizedValue)) {
-          setState(() {
-            tempSearchStore.add(element);
-          });
+      
+      // Nếu vẫn không có kết quả, thử tìm kiếm tất cả sản phẩm
+      if (tempSearchStore.isEmpty) {
+        QuerySnapshot allProducts = await DatabaseMethods().advancedSearch(value);
+        List<Map<String, dynamic>> allResults = [];
+        
+        for (var doc in allProducts.docs) {
+          allResults.add(doc.data() as Map<String, dynamic>);
         }
-      });
+        
+        setState(() {
+          queryResultSet = allResults;
+          tempSearchStore = queryResultSet.where((element) {
+            String name = element['Name']?.toString().toUpperCase() ?? '';
+            return name.contains(searchValue);
+          }).toList();
+        });
+      }
     }
   }
 
@@ -74,6 +126,7 @@ class _HomeState extends State<Home> {
   getthesharedpref() async {
     name = await SharedPreferenceHelper().getUserName();
     image = await SharedPreferenceHelper().getUserImage();
+    userId = await SharedPreferenceHelper().getUserId() ?? ""; // Lấy userId từ SharedPreferences
     setState(() {});
   }
 
@@ -85,7 +138,13 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     ontheload();
+    updateProductsWithSoldCount();
+    getBestSellingProducts();
     super.initState();
+  }
+
+  void updateProductsWithSoldCount() async {
+    await DatabaseMethods().updateAllProductsWithSoldCount();
   }
 
   @override
@@ -127,49 +186,105 @@ class _HomeState extends State<Home> {
                                         fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            Stack(
+                            Row(
                               children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => CartPage()),
-                                    ).then((_) {
-                                      // Cập nhật UI khi quay lại từ trang giỏ hàng
-                                      setState(() {});
-                                    });
-                                  },
-                                  child: Icon(
-                                    Icons.shopping_cart_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                ),
-                                if (CartService.cartItems.isNotEmpty)
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    child: Container(
-                                      padding: EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      constraints: BoxConstraints(
-                                        minWidth: 16,
-                                        minHeight: 16,
-                                      ),
-                                      child: Text(
-                                        '${CartService.cartItems.length}',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        textAlign: TextAlign.center,
+                                // Icon thông báo
+                                Stack(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => NotificationsPage()),
+                                        );
+                                      },
+                                      child: Icon(
+                                        Icons.notifications_outlined,
+                                        color: Colors.white,
+                                        size: 30,
                                       ),
                                     ),
-                                  ),
+                                    StreamBuilder<int>(
+                                      stream: NotificationService.getUnreadCount(userId),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData && snapshot.data! > 0) {
+                                          return Positioned(
+                                            right: 0,
+                                            top: 0,
+                                            child: Container(
+                                              padding: EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              constraints: BoxConstraints(
+                                                minWidth: 16,
+                                                minHeight: 16,
+                                              ),
+                                              child: Text(
+                                                snapshot.data! > 9 ? '9+' : snapshot.data!.toString(),
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return SizedBox.shrink();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(width: 16),
+                                // Icon giỏ hàng (giữ nguyên code hiện tại)
+                                Stack(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => CartPage()),
+                                        ).then((_) {
+                                          // Cập nhật UI khi quay lại từ trang giỏ hàng
+                                          setState(() {});
+                                        });
+                                      },
+                                      child: Icon(
+                                        Icons.shopping_cart_outlined,
+                                        color: Colors.white,
+                                        size: 30,
+                                      ),
+                                    ),
+                                    if (CartService.cartItems.isNotEmpty)
+                                      Positioned(
+                                        right: 0,
+                                        top: 0,
+                                        child: Container(
+                                          padding: EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            '${CartService.cartItems.length}',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ],
                             ),
                           ],
@@ -283,7 +398,7 @@ class _HomeState extends State<Home> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "Popular Products", 
+                              "Best Selling Products",
                               style: TextStyle(
                                 fontSize: 18, 
                                 fontWeight: FontWeight.bold
@@ -305,7 +420,7 @@ class _HomeState extends State<Home> {
                         ),
                         SizedBox(height: 15),
                         StreamBuilder(
-                          stream: FirebaseFirestore.instance.collection("Products").limit(6).snapshots(),
+                          stream: bestSellingStream,
                           builder: (context, AsyncSnapshot snapshot) {
                             if (!snapshot.hasData) {
                               return Center(child: CircularProgressIndicator());
@@ -342,203 +457,247 @@ class _HomeState extends State<Home> {
                                   originalPrice = discountedPrice.toStringAsFixed(1);
                                 }
                                 
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.1),
-                                        spreadRadius: 1,
-                                        blurRadius: 3,
-                                        offset: Offset(0, 1),
+                                // Hiển thị số lượng đã bán
+                                int soldCount = ds["SoldCount"] ?? 0;
+                                
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ProductDetail(
+                                          image: ds["Image"],
+                                          name: ds["Name"],
+                                          detail: ds["Detail"] ?? "",
+                                          price: originalPrice,
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Phần ảnh sản phẩm
-                                      Stack(
-                                        children: [
-                                          GestureDetector(
-                                            onTap: () {
-                                              // Chuyển đến trang chi tiết sản phẩm khi nhấn vào hình ảnh
-                                              Navigator.push(
-                                                context, 
-                                                MaterialPageRoute(
-                                                  builder: (context) => ProductDetail(
-                                                    detail: ds["Detail"] ?? "",
-                                                    image: ds["Image"],
-                                                    name: ds["Name"],
-                                                    price: originalPrice
-                                                  )
-                                                )
-                                              );
-                                            },
-                                            child: Container(
-                                              height: 120,
-                                              width: double.infinity,
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.only(
-                                                  topLeft: Radius.circular(10),
-                                                  topRight: Radius.circular(10),
-                                                ),
-                                                child: Image.memory(
-                                                  bytes,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          
-                                          // Badge giảm giá
-                                          if (hasDiscount)
-                                            Positioned(
-                                              left: 0,
-                                              top: 8,
-                                              child: Container(
-                                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.amber,
-                                                  borderRadius: BorderRadius.only(
-                                                    topRight: Radius.circular(8),
-                                                    bottomRight: Radius.circular(8),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  "$discountPercent%",
-                                                  style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          
-                                          // Nút yêu thích
-                                          Positioned(
-                                            right: 8,
-                                            top: 8,
-                                            child: Container(
-                                              padding: EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                Icons.favorite_border,
-                                                color: Colors.grey,
-                                                size: 20,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      
-                                      // Phần thông tin sản phẩm
-                                      Padding(
-                                        padding: EdgeInsets.all(8),
-                                        child: Column(
+                                    );
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.grey.withOpacity(0.1),
+                                          spreadRadius: 1,
+                                          blurRadius: 3,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              ds["Name"],
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            Row(
+                                            // Phần hình ảnh sản phẩm
+                                            Stack(
                                               children: [
-                                                Icon(
-                                                  Icons.star,
-                                                  color: Colors.amber,
-                                                  size: 14,
-                                                ),
-                                                Text(
-                                                  " ${3.5 + (index % 2) * 0.5}",
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
+                                                Container(
+                                                  height: 120,
+                                                  width: double.infinity,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.only(
+                                                      topLeft: Radius.circular(10),
+                                                      topRight: Radius.circular(10),
+                                                    ),
+                                                  ),
+                                                  child: ClipRRect(
+                                                    borderRadius: BorderRadius.only(
+                                                      topLeft: Radius.circular(10),
+                                                      topRight: Radius.circular(10),
+                                                    ),
+                                                    child: Image.memory(
+                                                      bytes,
+                                                      fit: BoxFit.cover,
+                                                    ),
                                                   ),
                                                 ),
-                                              ],
-                                            ),
-                                            SizedBox(height: 8),
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    if (hasDiscount)
-                                                      Text(
-                                                        "\$$discountPrice",
+                                                
+                                                // Badge giảm giá
+                                                if (hasDiscount)
+                                                  Positioned(
+                                                    left: 0,
+                                                    top: 8,
+                                                    child: Container(
+                                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.amber,
+                                                        borderRadius: BorderRadius.only(
+                                                          topRight: Radius.circular(8),
+                                                          bottomRight: Radius.circular(8),
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        "$discountPercent%",
                                                         style: TextStyle(
-                                                          decoration: TextDecoration.lineThrough,
-                                                          color: Colors.grey,
+                                                          color: Colors.black,
+                                                          fontWeight: FontWeight.bold,
                                                           fontSize: 12,
                                                         ),
                                                       ),
-                                                    Text(
-                                                      "\$${originalPrice}",
-                                                      style: TextStyle(
-                                                        color: Color(0xfffd6f3e),
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
                                                     ),
-                                                  ],
-                                                ),
-                                                GestureDetector(
-                                                  onTap: () {
-                                                    // Thêm vào giỏ hàng
-                                                    double priceValue = double.tryParse(originalPrice) ?? 0.0;
-                                                    CartItem item = CartItem(
-                                                      brand: ds["Category"] ?? "Brand",
-                                                      name: ds["Name"],
-                                                      color: "",
-                                                      size: "",
-                                                      price: priceValue,
-                                                      quantity: 1,
-                                                      image: ds["Image"],
-                                                      detail: ds["Detail"] ?? "",
-                                                    );
-                                                    CartService.addToCart(item);
-                                                    
-                                                    // Hiển thị thông báo
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(
-                                                        content: Text("Đã thêm sản phẩm vào giỏ hàng"),
-                                                        backgroundColor: Colors.green,
-                                                        duration: Duration(seconds: 2),
-                                                      ),
-                                                    );
-                                                  },
+                                                  ),
+                                                
+                                                // Nút yêu thích
+                                                Positioned(
+                                                  right: 8,
+                                                  top: 8,
                                                   child: Container(
-                                                    padding: EdgeInsets.all(6),
+                                                    padding: EdgeInsets.all(4),
                                                     decoration: BoxDecoration(
-                                                      color: Color(0xfffd6f3e),
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      color: Colors.white,
+                                                      shape: BoxShape.circle,
                                                     ),
                                                     child: Icon(
-                                                      Icons.add,
-                                                      color: Colors.white,
+                                                      Icons.favorite_border,
+                                                      color: Colors.grey,
                                                       size: 20,
                                                     ),
                                                   ),
                                                 ),
                                               ],
                                             ),
+                                            
+                                            // Phần thông tin sản phẩm
+                                            Padding(
+                                              padding: EdgeInsets.all(8),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    ds["Name"],
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w500,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.star,
+                                                        color: Colors.amber,
+                                                        size: 14,
+                                                      ),
+                                                      Text(
+                                                        " ${3.5 + (index % 2) * 0.5}",
+                                                        style: TextStyle(
+                                                          color: Colors.grey[600],
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                      // Thêm badge "Đã bán" ở đây
+                                                      Spacer(),
+                                                      Container(
+                                                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.red.withOpacity(0.1),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          "Đã bán: $soldCount",
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            "\$${originalPrice}",
+                                                            style: TextStyle(
+                                                              color: Color(0xfffd6f3e),
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 16,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      GestureDetector(
+                                                        onTap: () {
+                                                          // Thêm vào giỏ hàng
+                                                          double priceValue = double.tryParse(originalPrice) ?? 0.0;
+                                                          CartItem item = CartItem(
+                                                            brand: ds["Category"] ?? "Brand",
+                                                            name: ds["Name"],
+                                                            color: "",
+                                                            size: "",
+                                                            price: priceValue,
+                                                            quantity: 1,
+                                                            image: ds["Image"],
+                                                            detail: ds["Detail"] ?? "",
+                                                          );
+                                                          CartService.addToCart(item);
+                                                          
+                                                          // Hiển thị thông báo
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            SnackBar(
+                                                              content: Text("Đã thêm sản phẩm vào giỏ hàng"),
+                                                              backgroundColor: Colors.green,
+                                                              duration: Duration(seconds: 2),
+                                                            ),
+                                                          );
+                                                        },
+                                                        child: Container(
+                                                          padding: EdgeInsets.all(6),
+                                                          decoration: BoxDecoration(
+                                                            color: Color(0xfffd6f3e),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: Icon(
+                                                            Icons.add,
+                                                            color: Colors.white,
+                                                            size: 20,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      ),
-                                    ],
+                                        // Thêm badge "Hot" cho sản phẩm bán chạy nhất
+                                        if (index == 0)
+                                          Positioned(
+                                            top: 0,
+                                            right: 0,
+                                            child: Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red,
+                                                borderRadius: BorderRadius.only(
+                                                  topRight: Radius.circular(10),
+                                                  bottomLeft: Radius.circular(10),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                "HOT",
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
@@ -602,24 +761,104 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget buildResultCard(data) {
-    return Container(
-      height: 100,
-      child: Row(
-        children: [
-          Image.network(
-            data["Image"],
-            height: 50,
-            width: 50,
-            fit: BoxFit.cover,
+  Widget buildResultCard(var data) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetail(
+              image: data["Image"],
+              name: data["Name"],
+              detail: data["Detail"] ?? "",
+              price: data["Price"],
+            ),
           ),
-          SizedBox(width: 10),
-          Text(
-            data["Name"],
-            style: AppWidget.semiboldTextFeildStyle()
-                .copyWith(color: Colors.white),
-          )
-        ],
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                bottomLeft: Radius.circular(10),
+              ),
+              child: Image.memory(
+                base64Decode(data["Image"]),
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data["Name"],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    "\$${data["Price"]}",
+                    style: TextStyle(
+                      color: Color(0xfffd6f3e),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.add_shopping_cart, color: Color(0xfffd6f3e)),
+              onPressed: () {
+                // Thêm vào giỏ hàng
+                double priceValue = double.tryParse(data["Price"]) ?? 0.0;
+                CartItem item = CartItem(
+                  brand: data["Category"] ?? "Brand",
+                  name: data["Name"],
+                  color: "",
+                  size: "",
+                  price: priceValue,
+                  quantity: 1,
+                  image: data["Image"],
+                  detail: data["Detail"] ?? "",
+                );
+                CartService.addToCart(item);
+                
+                // Hiển thị thông báo
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Đã thêm sản phẩm vào giỏ hàng"),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                setState(() {}); // Cập nhật UI
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
