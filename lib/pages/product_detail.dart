@@ -30,11 +30,15 @@ class _ProductDetailState extends State<ProductDetail> {
   String? name;
   String? mail;
   String? image;
+  // Thêm biến để theo dõi trạng thái yêu thích
+  bool isFavorite = false;
 
   @override
   void initState() {
     super.initState();
     getthesharedpref();
+    // Kiểm tra sản phẩm có trong danh sách yêu thích không
+    checkFavoriteStatus();
   }
 
   getthesharedpref() async {
@@ -42,6 +46,75 @@ class _ProductDetailState extends State<ProductDetail> {
     mail = await SharedPreferenceHelper().getUserEmail();
     image = await SharedPreferenceHelper().getUserProfile();
     setState(() {});
+  }
+
+  // Kiểm tra trạng thái yêu thích
+  Future<void> checkFavoriteStatus() async {
+    if (FirebaseAuth.instance.currentUser != null) {
+      bool favorite = await DatabaseMethods().isProductFavorite(
+        FirebaseAuth.instance.currentUser!.email!,
+        widget.name
+      );
+      setState(() {
+        isFavorite = favorite;
+      });
+    }
+  }
+
+  // Thêm/xóa sản phẩm khỏi danh sách yêu thích
+  Future<void> toggleFavorite() async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      // Chuyển hướng đến trang đăng nhập
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => Login()),
+      );
+      return;
+    }
+
+    try {
+      // Lấy thông tin người dùng
+      String? userEmail = FirebaseAuth.instance.currentUser!.email;
+      String? userName = await SharedPreferenceHelper().getUserName();
+      String? userImage = await SharedPreferenceHelper().getUserProfile();
+
+      // Lấy thông tin sản phẩm
+      Map<String, dynamic> favoriteData = {
+        "UserEmail": userEmail,
+        "UserName": userName ?? "",
+        "UserImage": userImage ?? "",
+        "ProductId": widget.name,
+        "ProductName": widget.name,
+        "ProductPrice": widget.price,
+        "ProductImage": widget.image,
+        "ProductDetail": widget.detail,
+      };
+
+      // Thêm/xóa khỏi danh sách yêu thích
+      await DatabaseMethods().addToFavorites(favoriteData);
+
+      // Cập nhật trạng thái
+      setState(() {
+        isFavorite = !isFavorite;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFavorite 
+            ? "Đã thêm vào danh sách yêu thích" 
+            : "Đã xóa khỏi danh sách yêu thích"),
+          backgroundColor: isFavorite ? Colors.green : Colors.red,
+        ),
+      );
+    } catch (e) {
+      print("Lỗi khi thêm/xóa yêu thích: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Đã xảy ra lỗi: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -142,6 +215,15 @@ class _ProductDetailState extends State<ProductDetail> {
                     ],
                   ),
                   Spacer(),
+                  // Nút yêu thích
+                  GestureDetector(
+                    onTap: toggleFavorite,
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : Colors.grey.shade700,
+                    ),
+                  ),
+                  SizedBox(width: 16),
                   Icon(Icons.share, color: Colors.grey.shade700),
                 ],
               ),

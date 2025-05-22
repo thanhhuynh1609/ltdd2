@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shopping_app/services/cart_service.dart';
 import 'package:shopping_app/pages/product_detail.dart';
+import 'package:shopping_app/pages/favorites_page.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -91,6 +92,12 @@ class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Trang chủ"),
+        actions: [
+          // Các nút khác...
+        ],
+      ),
       body: name == null
           ? Center(child: CircularProgressIndicator())
           : Stack(

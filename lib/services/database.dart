@@ -395,4 +395,65 @@ class DatabaseMethods {
       throw e;
     }
   }
+
+  // Thêm sản phẩm vào danh sách yêu thích
+  Future<void> addToFavorites(Map<String, dynamic> favoriteData) async {
+    try {
+      // Kiểm tra xem sản phẩm đã có trong danh sách yêu thích chưa
+      String userEmail = favoriteData["UserEmail"] ?? "";
+      String productId = favoriteData["ProductId"] ?? "";
+      
+      if (userEmail.isNotEmpty && productId.isNotEmpty) {
+        QuerySnapshot existingFavorites = await FirebaseFirestore.instance
+            .collection("Favorites")
+            .where("UserEmail", isEqualTo: userEmail)
+            .where("ProductId", isEqualTo: productId)
+            .get();
+        
+        if (existingFavorites.docs.isNotEmpty) {
+          // Nếu đã có trong danh sách yêu thích, xóa khỏi danh sách
+          await FirebaseFirestore.instance
+              .collection("Favorites")
+              .doc(existingFavorites.docs.first.id)
+              .delete();
+          return;
+        }
+      }
+      
+      // Thêm timestamp
+      favoriteData["Timestamp"] = FieldValue.serverTimestamp();
+      
+      // Thêm vào collection "Favorites"
+      await FirebaseFirestore.instance
+          .collection("Favorites")
+          .add(favoriteData);
+    } catch (e) {
+      print("Lỗi khi thêm vào danh sách yêu thích: $e");
+      throw e;
+    }
+  }
+
+  // Kiểm tra sản phẩm có trong danh sách yêu thích không
+  Future<bool> isProductFavorite(String userEmail, String productId) async {
+    try {
+      QuerySnapshot favorites = await FirebaseFirestore.instance
+          .collection("Favorites")
+          .where("UserEmail", isEqualTo: userEmail)
+          .where("ProductId", isEqualTo: productId)
+          .get();
+      
+      return favorites.docs.isNotEmpty;
+    } catch (e) {
+      print("Lỗi khi kiểm tra sản phẩm yêu thích: $e");
+      return false;
+    }
+  }
+
+  // Lấy danh sách sản phẩm yêu thích của người dùng
+  Future<Stream<QuerySnapshot>> getFavorites(String userEmail) async {
+    return FirebaseFirestore.instance
+        .collection("Favorites")
+        .where("UserEmail", isEqualTo: userEmail)
+        .snapshots();
+  }
 }
