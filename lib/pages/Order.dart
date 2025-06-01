@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shopping_app/services/database.dart';
 import 'package:shopping_app/services/shared_pref.dart';
 import 'dart:convert';
+import 'package:shopping_app/pages/order_detail_page.dart';
 
 class Order extends StatefulWidget {
   const Order({Key? key}) : super(key: key);
@@ -13,7 +14,8 @@ class Order extends StatefulWidget {
 
 class _OrderState extends State<Order> {
   String? id = "";
-  Stream? orderStream;
+  List<Map<String, dynamic>> orders = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -27,8 +29,38 @@ class _OrderState extends State<Order> {
   }
 
   getOrderData() async {
-    orderStream = await DatabaseMethods().getOrders(id!);
-    setState(() {});
+    setState(() {
+      isLoading = true;
+    });
+    
+    try {
+      // Lấy dữ liệu đơn hàng và sắp xếp theo thời gian giảm dần
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection("Orders")
+          .where("UserId", isEqualTo: id)
+          .orderBy("CreatedAt", descending: true)
+          .get();
+      
+      orders = [];
+      
+      for (var doc in querySnapshot.docs) {
+        Map<String, dynamic> orderData = doc.data() as Map<String, dynamic>;
+        
+        // Thêm ID của document
+        orderData['id'] = doc.id;
+        
+        orders.add(orderData);
+      }
+      
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Lỗi khi lấy dữ liệu đơn hàng: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -45,17 +77,17 @@ class _OrderState extends State<Order> {
       ),
       body: Container(
         margin: EdgeInsets.symmetric(horizontal: 20.0),
-        child: StreamBuilder(
-          stream: orderStream,
-          builder: (context, AsyncSnapshot snapshot) {
-            return snapshot.hasData
-                ? ListView.builder(
-                    itemCount: snapshot.data.docs.length,
+        child: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : orders.isEmpty
+                ? Center(child: Text("Không có đơn hàng nào"))
+                : ListView.builder(
+                    itemCount: orders.length,
                     itemBuilder: (context, index) {
-                      DocumentSnapshot ds = snapshot.data.docs[index];
+                      Map<String, dynamic> order = orders[index];
                       
                       // Kiểm tra xem trường Status có tồn tại không
-                      String status = ds["Status"] ?? "Đang xử lý";
+                      String status = order["Status"] ?? "Đang xử lý";
                       
                       return Container(
                         margin: EdgeInsets.only(bottom: 20.0),
@@ -72,7 +104,7 @@ class _OrderState extends State<Order> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      "Đơn hàng #${ds.id.substring(0, 8)}",
+                                      "Đơn hàng #${order['id'].toString().substring(0, 8)}",
                                       style: TextStyle(
                                         color: Colors.black,
                                         fontSize: 16,
@@ -100,8 +132,8 @@ class _OrderState extends State<Order> {
                                 ),
                                 SizedBox(height: 10),
                                 // Hiển thị danh sách sản phẩm
-                                if (ds["Products"] != null)
-                                  ...buildProductList(ds["Products"]),
+                                if (order["Products"] != null)
+                                  ...buildProductList(order["Products"]),
                                 SizedBox(height: 10),
                                 Divider(),
                                 Row(
@@ -116,7 +148,7 @@ class _OrderState extends State<Order> {
                                       ),
                                     ),
                                     Text(
-                                      "\$${ds["TotalAmount"] ?? "0"}",
+                                      "\$${order["TotalAmount"] ?? "0"}",
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
@@ -125,16 +157,44 @@ class _OrderState extends State<Order> {
                                     ),
                                   ],
                                 ),
+                                SizedBox(height: 10),
+                                // Thêm nút xem chi tiết
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => OrderDetailPage(
+                                          orderData: {
+                                            'id': order['id'],
+                                            'OrderId': order['id'].toString().substring(0, 8),
+                                            'Status': status,
+                                            'TotalAmount': order["TotalAmount"] ?? "0",
+                                            'Products': order["Products"] ?? [],
+                                            'CreatedAt': order["CreatedAt"],
+                                            'PaymentMethod': order["PaymentMethod"] ?? "Tiền mặt",
+                                            'RefundStatus': order["RefundStatus"] ?? "", // Thêm trạng thái hoàn tiền
+                                          },
+                                        ),
+                                      ),
+                                    ).then((_) {
+                                      // Làm mới dữ liệu khi quay lại
+                                      getOrderData();
+                                    });
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF4A5CFF),
+                                    minimumSize: Size(double.infinity, 40),
+                                  ),
+                                  child: Text("Xem chi tiết", style: TextStyle(color: Colors.white),),
+                                ),
                               ],
                             ),
                           ),
                         ),
                       );
                     },
-                  )
-                : Center(child: CircularProgressIndicator());
-          },
-        ),
+                  ),
       ),
     );
   }
@@ -253,3 +313,5 @@ class _OrderState extends State<Order> {
     }
   }
 }
+
+

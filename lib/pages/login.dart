@@ -20,9 +20,19 @@ class _LoginState extends State<Login> {
   TextEditingController mailcontroller = TextEditingController();
   TextEditingController passwordcontroller = TextEditingController();
   final _formkey = GlobalKey<FormState>();
+  bool isLoading = false; // Thêm biến isLoading
+  bool isChecked = false;
 
   userLogin() async {
     try {
+      // Hiển thị loading indicator
+      setState(() {
+        isLoading = true;
+      });
+      
+      // In ra thông tin đăng nhập để debug
+      print("Attempting login with email: $email");
+      
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
       
@@ -42,6 +52,9 @@ class _LoginState extends State<Login> {
                        style: TextStyle(fontSize: 18)),
         ));
         
+        setState(() {
+          isLoading = false;
+        });
         return;
       }
       
@@ -82,29 +95,80 @@ class _LoginState extends State<Login> {
       await SharedPreferenceHelper().saveUserName(userData["Name"]);
       await SharedPreferenceHelper().saveUserImage(userData["Image"]);
 
+      setState(() {
+        isLoading = false;
+      });
+
       // Chuyển hướng đến Bottomnav
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (context) => Bottomnav()));
-    } on FirebaseException catch (e) {
-      if (e.code == 'user-not-found') {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            backgroundColor: Colors.redAccent,
-            content: Text(
-              "No User Found for that Email",
-              style: TextStyle(fontSize: 20),
-            )));
-      } else if (e.code == "wrong-password") {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            backgroundColor: Colors.redAccent,
-            content: Text(
-              "Wrong Password Provided by User",
-              style: TextStyle(fontSize: 20),
-            )));
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      
+      // In ra mã lỗi để debug
+      print("FirebaseAuthException code: ${e.code}");
+      print("FirebaseAuthException message: ${e.message}");
+      
+      String errorMessage = "Đã xảy ra lỗi khi đăng nhập";
+      
+      // Xử lý các mã lỗi cụ thể
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = "Không tìm thấy tài khoản với email này";
+          break;
+        case 'wrong-password':
+          errorMessage = "Mật khẩu không chính xác";
+          break;
+        case 'invalid-email':
+          errorMessage = "Email không hợp lệ";
+          break;
+        case 'user-disabled':
+          errorMessage = "Tài khoản này đã bị vô hiệu hóa";
+          break;
+        case 'too-many-requests':
+          errorMessage = "Quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau";
+          break;
+        case 'invalid-credential':
+          errorMessage = "Thông tin đăng nhập không hợp lệ";
+          break;
+        case 'network-request-failed':
+          errorMessage = "Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet";
+          break;
+        default:
+          errorMessage = "Lỗi: ${e.message}";
+          break;
       }
+      
+      // Hiển thị thông báo lỗi với SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(
+          errorMessage,
+          style: TextStyle(fontSize: 16),
+        ),
+        duration: Duration(seconds: 3),
+      ));
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      
+      // In ra lỗi để debug
+      print("General exception: ${e.toString()}");
+      
+      // Hiển thị lỗi chung
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: Colors.redAccent,
+        content: Text(
+          "Lỗi: ${e.toString()}",
+          style: TextStyle(fontSize: 16),
+        ),
+        duration: Duration(seconds: 3),
+      ));
     }
   }
-
-  bool isChecked = false;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +293,7 @@ class _LoginState extends State<Login> {
                 SizedBox(height: 30),
                 GestureDetector(
                   onTap: () {
-                    if (_formkey.currentState!.validate()) {
+                    if (!isLoading && _formkey.currentState!.validate()) {
                       setState(() {
                         email = mailcontroller.text;
                         password = passwordcontroller.text;
@@ -245,13 +309,24 @@ class _LoginState extends State<Login> {
                           color: Color(0xff4b69fe),
                           borderRadius: BorderRadius.circular(20)),
                       child: Center(
-                          child: Text(
-                        "Login",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold),
-                      )),
+                        child: isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              "Login",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold
+                              ),
+                            ),
+                      ),
                     ),
                   ),
                 ),

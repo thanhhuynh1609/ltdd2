@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:shopping_app/services/notification_service.dart';
+
+import '../models/discount_code.dart';
 
 class DatabaseMethods {
   // Thêm thông tin người dùng vào Firestore
@@ -25,6 +28,10 @@ class DatabaseMethods {
 
   // Thêm tất cả sản phẩm vào collection "Products"
   Future addAllProducts(Map<String, dynamic> userInfoMap) async {
+    // Đảm bảo có trường SoldCount
+    if (!userInfoMap.containsKey("SoldCount")) {
+      userInfoMap["SoldCount"] = 0;
+    }
     return await FirebaseFirestore.instance
         .collection("Products")
         .add(userInfoMap);
@@ -33,6 +40,10 @@ class DatabaseMethods {
   // Thêm sản phẩm vào collection theo danh mục và trả về ID của document
   Future<String> addProduct(
       Map<String, dynamic> userInfoMap, String categoryname) async {
+    // Đảm bảo có trường SoldCount
+    if (!userInfoMap.containsKey("SoldCount")) {
+      userInfoMap["SoldCount"] = 0;
+    }
     DocumentReference docRef = await FirebaseFirestore.instance
         .collection(categoryname)
         .add(userInfoMap);
@@ -66,6 +77,7 @@ class DatabaseMethods {
     return FirebaseFirestore.instance
         .collection("Orders")
         .where("UserId", isEqualTo: userId)
+        .orderBy("CreatedAt", descending: true) // Sắp xếp theo thời gian giảm dần
         .snapshots();
   }
 
@@ -92,11 +104,22 @@ class DatabaseMethods {
         .add(userInfoMap);
   }
 
-  // Tìm kiếm sản phẩm theo tên
-  Future<QuerySnapshot> search(String updatename) async {
+  // Tìm kiếm sản phẩm theo tên - cải thiện
+  Future<QuerySnapshot> search(String searchTerm) async {
+    // Tìm kiếm theo ký tự đầu tiên
+    QuerySnapshot initialResults = await FirebaseFirestore.instance
+        .collection("Products")
+        .where("SearchKey", isEqualTo: searchTerm.substring(0, 1).toUpperCase())
+        .get();
+
+    return initialResults;
+  }
+
+  // Thêm phương thức tìm kiếm nâng cao
+  Future<QuerySnapshot> advancedSearch(String searchTerm) async {
+    // Tìm tất cả sản phẩm
     return await FirebaseFirestore.instance
         .collection("Products")
-        .where("SearchKey", isEqualTo: updatename.substring(0, 1).toUpperCase())
         .get();
   }
 
@@ -222,9 +245,41 @@ class DatabaseMethods {
       orderMap['CreatedAt'] = FieldValue.serverTimestamp();
 
       // Lưu đơn hàng vào Firestore
-      return await FirebaseFirestore.instance
+      DocumentReference orderRef = await FirebaseFirestore.instance
           .collection("Orders")
           .add(orderMap);
+
+      // Cập nhật SoldCount cho mỗi sản phẩm trong đơn hàng
+      if (orderMap.containsKey('Products') && orderMap['Products'] is List) {
+        List<dynamic> products = orderMap['Products'];
+
+        for (var product in products) {
+          if (product is Map && product.containsKey('Name')) {
+            String productName = product['Name'];
+            int quantity = int.tryParse(product['Quantity']?.toString() ?? '1') ?? 1;
+
+            // Tìm sản phẩm trong collection Products
+            QuerySnapshot productQuery = await FirebaseFirestore.instance
+                .collection("Products")
+                .where("Name", isEqualTo: productName)
+                .get();
+
+            if (productQuery.docs.isNotEmpty) {
+              DocumentReference productRef = productQuery.docs.first.reference;
+
+              // Lấy giá trị SoldCount hiện tại
+              int currentSoldCount = productQuery.docs.first.get("SoldCount") ?? 0;
+
+              // Cập nhật SoldCount
+              await productRef.update({
+                "SoldCount": currentSoldCount + quantity
+              });
+            }
+          }
+        }
+      }
+
+      return orderRef;
     } catch (e) {
       print("Lỗi khi tạo đơn hàng: $e");
       throw e;
@@ -395,4 +450,470 @@ class DatabaseMethods {
       throw e;
     }
   }
+
+  // Hàm tiện ích để cập nhật trường SoldCount cho tất cả sản phẩm
+  Future<void> updateAllProductsWithSoldCount() async {
+    try {
+      QuerySnapshot productsSnapshot = await FirebaseFirestore.instance
+          .collection("Products")
+          .get();
+
+      for (var doc in productsSnapshot.docs) {
+        if (!doc.data().toString().contains('SoldCount')) {
+          await doc.reference.update({"SoldCount": 0});
+        }
+      }
+
+      print("Đã cập nhật SoldCount cho tất cả sản phẩm");
+    } catch (e) {
+      print("Lỗi khi cập nhật SoldCount: $e");
+    }
+  }
+
+  // Thêm các phương thức quản lý ví vào class DatabaseMethods
+
+  // Lấy thông tin ví của người dùng
+  Future<Map<String, dynamic>?> getUserWallet(String userId) async {
+    try {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance
+          .collection("wallets")
+          .doc(userId)
+          .get();
+
+      if (snapshot.exists) {
+        return snapshot.data() as Map<String, dynamic>;
+      } else {
+        // Nếu ví chưa tồn tại, tạo ví mới với số dư 0
+        Map<String, dynamic> newWallet = {
+          'userId': userId,
+          'balance': 0.0,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        };
+
+        await FirebaseFirestore.instance
+            .collection("wallets")
+            .doc(userId)
+            .set(newWallet);
+
+        return newWallet;
+      }
+    } catch (e) {
+      print("Error fetching user wallet: $e");
+      return null;
+    }
+  }
+
+  // Cập nhật số dư ví
+  Future<bool> updateWalletBalance(String userId, double amount, String type, String description, {String? paymentId, String? orderId}) async {
+    try {
+      // Bắt đầu transaction để đảm bảo tính nhất quán dữ liệu
+      return await FirebaseFirestore.instance.runTransaction<bool>((transaction) async {
+        // Lấy thông tin ví hiện tại
+        DocumentReference walletRef = FirebaseFirestore.instance.collection("wallets").doc(userId);
+        DocumentSnapshot walletSnapshot = await transaction.get(walletRef);
+
+        double currentBalance = 0.0;
+
+        // Nếu ví đã tồn tại
+        if (walletSnapshot.exists) {
+          Map<String, dynamic> walletData = walletSnapshot.data() as Map<String, dynamic>;
+          currentBalance = (walletData['balance'] ?? 0.0).toDouble();
+        }
+
+        // Tính số dư mới
+        double newBalance = currentBalance + amount;
+
+        // Kiểm tra số dư đủ không (nếu là giao dịch trừ tiền)
+        if (amount < 0 && newBalance < 0) {
+          return false;
+        }
+
+        // Cập nhật số dư ví
+        transaction.set(walletRef, {
+          'userId': userId,
+          'balance': newBalance,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Tạo giao dịch mới
+        DocumentReference transactionRef = FirebaseFirestore.instance.collection("wallet_transactions").doc();
+        transaction.set(transactionRef, {
+          'userId': userId,
+          'amount': amount,
+          'type': type,
+          'description': description,
+          'paymentId': paymentId,
+          'orderId': orderId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'completed'
+        });
+
+        return true;
+      });
+    } catch (e) {
+      print("Error updating wallet balance: $e");
+      return false;
+    }
+  }
+
+  // Lấy lịch sử giao dịch ví
+  Future<Stream<QuerySnapshot>> getWalletTransactions(String userId) async {
+    return FirebaseFirestore.instance
+        .collection("wallet_transactions")
+        .where("userId", isEqualTo: userId)
+        .orderBy("timestamp", descending: true)
+        .snapshots();
+  }
+
+  // Tạo yêu cầu hoàn tiền
+  Future<String> createRefundRequest(Map<String, dynamic> refundData) async {
+    try {
+      DocumentReference refundRef = await FirebaseFirestore.instance
+          .collection("refund_requests")
+          .add(refundData);
+
+      // Cập nhật trạng thái đơn hàng
+      await FirebaseFirestore.instance
+          .collection("Orders")
+          .doc(refundData['orderId'])
+          .update({"RefundStatus": "pending"});
+
+      return refundRef.id;
+    } catch (e) {
+      print("Lỗi khi tạo yêu cầu hoàn tiền: $e");
+      throw e;
+    }
+  }
+
+  // Lấy danh sách yêu cầu hoàn tiền của người dùng
+  Future<List<Map<String, dynamic>>> getUserRefundRequests(String userId) async {
+    try {
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection("refund_requests")
+          .where("userId", isEqualTo: userId)
+          .orderBy("requestDate", descending: true)
+          .get();
+
+      List<Map<String, dynamic>> refundRequests = [];
+      for (var doc in querySnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        refundRequests.add(data);
+      }
+
+      return refundRequests;
+    } catch (e) {
+      print("Lỗi khi lấy danh sách yêu cầu hoàn tiền: $e");
+      return [];
+    }
+  }
+
+  // Lấy tất cả yêu cầu hoàn tiền (cho admin)
+  Future<List<Map<String, dynamic>>> getAllRefundRequests() async {
+    try {
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection("refund_requests")
+          .orderBy("requestDate", descending: true)
+          .get();
+
+      List<Map<String, dynamic>> refundRequests = [];
+      for (var doc in querySnapshot.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        refundRequests.add(data);
+      }
+
+      return refundRequests;
+    } catch (e) {
+      print("Lỗi khi lấy tất cả yêu cầu hoàn tiền: $e");
+      return [];
+    }
+  }
+
+  // Xử lý yêu cầu hoàn tiền (chấp nhận hoặc từ chối)
+  Future<bool> processRefundRequest(String refundId, String status, String orderId) async {
+    try {
+      // Cập nhật trạng thái yêu cầu hoàn tiền
+      await FirebaseFirestore.instance
+          .collection("refund_requests")
+          .doc(refundId)
+          .update({
+        "status": status,
+        "processDate": FieldValue.serverTimestamp(),
+      });
+
+      // Cập nhật trạng thái đơn hàng
+      await FirebaseFirestore.instance
+          .collection("Orders")
+          .doc(orderId)
+          .update({"RefundStatus": status});
+
+      return true;
+    } catch (e) {
+      print("Lỗi khi xử lý yêu cầu hoàn tiền: $e");
+      return false;
+    }
+  }
+
+  // Hoàn tiền vào ví người dùng
+  Future<bool> refundToWallet(String userId, double amount, String orderId) async {
+    try {
+      // Bắt đầu transaction để đảm bảo tính nhất quán dữ liệu
+      return await FirebaseFirestore.instance.runTransaction<bool>((transaction) async {
+        // Lấy thông tin ví hiện tại
+        DocumentReference walletRef = FirebaseFirestore.instance.collection("wallets").doc(userId);
+        DocumentSnapshot walletSnapshot = await transaction.get(walletRef);
+
+        double currentBalance = 0.0;
+
+        // Nếu ví đã tồn tại
+        if (walletSnapshot.exists) {
+          Map<String, dynamic> walletData = walletSnapshot.data() as Map<String, dynamic>;
+          currentBalance = (walletData['balance'] ?? 0.0).toDouble();
+        }
+
+        // Tính số dư mới
+        double newBalance = currentBalance + amount;
+
+        // Cập nhật số dư ví
+        transaction.set(walletRef, {
+          'userId': userId,
+          'balance': newBalance,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Tạo giao dịch mới
+        DocumentReference transactionRef = FirebaseFirestore.instance.collection("wallet_transactions").doc();
+        transaction.set(transactionRef, {
+          'userId': userId,
+          'amount': amount,
+          'type': 'refund',  // Đảm bảo loại giao dịch là 'refund'
+          'description': 'Hoàn tiền đơn hàng',  // Mô tả rõ ràng
+          'orderId': orderId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'completed'
+        });
+
+        return true;
+      });
+    } catch (e) {
+      print("Lỗi khi hoàn tiền vào ví: $e");
+      return false;
+    }
+  }
+
+  // Thêm phương thức processRefund vào lớp DatabaseMethods
+  Future<bool> processRefund(String userId, double amount, String orderId) async {
+    try {
+      return await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Lấy tham chiếu đến ví người dùng
+        DocumentReference walletRef = FirebaseFirestore.instance.collection("wallets").doc(userId);
+
+        // Lấy dữ liệu ví hiện tại
+        DocumentSnapshot walletSnapshot = await transaction.get(walletRef);
+
+        // Kiểm tra ví có tồn tại không
+        double currentBalance = 0.0;
+        if (walletSnapshot.exists) {
+          Map<String, dynamic> walletData = walletSnapshot.data() as Map<String, dynamic>;
+          currentBalance = walletData['balance'] ?? 0.0;
+        }
+
+        // Tính số dư mới
+        double newBalance = currentBalance + amount;
+
+        // Cập nhật số dư ví
+        transaction.set(walletRef, {
+          'userId': userId,
+          'balance': newBalance,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Tạo giao dịch mới
+        DocumentReference transactionRef = FirebaseFirestore.instance.collection("wallet_transactions").doc();
+        transaction.set(transactionRef, {
+          'userId': userId,
+          'amount': amount,
+          'type': 'refund',  // Đảm bảo loại giao dịch là 'refund'
+          'description': 'Hoàn tiền đơn hàng',  // Mô tả rõ ràng
+          'orderId': orderId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'completed'
+        });
+
+        // Tạo thông báo về giao dịch ví
+        await NotificationService.createNotification(
+          userId: userId,
+          title: "Giao dịch ví thành công",
+          message: "Số dư ví của bạn đã được cộng \$${amount.toStringAsFixed(2)} từ hoàn tiền đơn hàng.",
+          type: "wallet_transaction",
+          orderId: orderId,
+        );
+
+        return true;
+      });
+    } catch (e) {
+      print("Lỗi khi hoàn tiền vào ví: $e");
+      return false;
+    }
+  }
+  Future<List<DiscountCode>> getDiscountCodes() async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .orderBy("createdAt", descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) => DiscountCode.fromJson(doc.data() as Map<String, dynamic>, doc.id)).toList();
+    } catch (e) {
+      print("Lỗi khi lấy danh sách mã giảm giá: $e");
+      return [];
+    }
+  }
+
+  // Thêm mã giảm giá (cho Admin)
+  Future<void> addDiscountCode(DiscountCode discountCode) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .add(discountCode.toJson()..['createdAt'] = FieldValue.serverTimestamp());
+    } catch (e) {
+      print("Lỗi khi thêm mã giảm giá: $e");
+      throw e;
+    }
+  }
+
+  // Sửa mã giảm giá (cho Admin)
+  Future<void> updateDiscountCode(DiscountCode discountCode) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .doc(discountCode.id)
+          .update(discountCode.toJson());
+    } catch (e) {
+      print("Lỗi khi cập nhật mã giảm giá: $e");
+      throw e;
+    }
+  }
+
+  // Xóa mã giảm giá (cho Admin)
+  Future<void> deleteDiscountCode(String id) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .doc(id)
+          .delete();
+    } catch (e) {
+      print("Lỗi khi xóa mã giảm giá: $e");
+      throw e;
+    }
+  }
+
+  // Kiểm tra mã giảm giá (cho người dùng)
+  Future<DiscountCode?> checkDiscountCode(String code, double orderTotal) async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .where("code", isEqualTo: code)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+
+      DiscountCode discountCode = DiscountCode.fromJson(snapshot.docs.first.data() as Map<String, dynamic>, snapshot.docs.first.id);
+
+      // Kiểm tra điều kiện hợp lệ
+      if (!discountCode.isActive) return null; // Mã không hoạt động
+
+      DateTime now = DateTime.now();
+      // Kiểm tra ngày bắt đầu
+      if (discountCode.startDate != null && discountCode.startDate!.isAfter(now)) return null; // Mã chưa có hiệu lực
+      // Kiểm tra ngày hết hạn
+      if (discountCode.expiryDate != null && discountCode.expiryDate!.isBefore(now)) return null; // Mã đã hết hạn
+      // Kiểm tra số tiền tối thiểu
+      if (discountCode.minOrderAmount != null && orderTotal < discountCode.minOrderAmount!) return null; // Đơn hàng không đủ điều kiện
+
+      return discountCode;
+    } catch (e) {
+      print("Lỗi khi kiểm tra mã giảm giá: $e");
+      return null;
+    }
+  }
+
+  // Cập nhật usageCount sau khi mã được sử dụng
+  Future<void> incrementDiscountCodeUsage(String discountCodeId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("discount_codes")
+          .doc(discountCodeId)
+          .update({
+        "usageCount": FieldValue.increment(1),
+      });
+    } catch (e) {
+      print("Lỗi khi cập nhật usageCount: $e");
+      throw e;
+    }
+  }
+
+
+  // Thêm sản phẩm vào danh sách yêu thích
+Future<void> addToFavorites(Map<String, dynamic> favoriteData) async {
+  try {
+    // Kiểm tra xem sản phẩm đã có trong danh sách yêu thích chưa
+    String userEmail = favoriteData["UserEmail"] ?? "";
+    String productId = favoriteData["ProductId"] ?? "";
+    
+    if (userEmail.isNotEmpty && productId.isNotEmpty) {
+      QuerySnapshot existingFavorites = await FirebaseFirestore.instance
+          .collection("Favorites")
+          .where("UserEmail", isEqualTo: userEmail)
+          .where("ProductId", isEqualTo: productId)
+          .get();
+      
+      if (existingFavorites.docs.isNotEmpty) {
+        // Nếu đã có trong danh sách yêu thích, xóa khỏi danh sách
+        await FirebaseFirestore.instance
+            .collection("Favorites")
+            .doc(existingFavorites.docs.first.id)
+            .delete();
+        return;
+      }
+    }
+    
+    // Thêm timestamp
+    favoriteData["Timestamp"] = FieldValue.serverTimestamp();
+    
+    // Thêm vào collection "Favorites"
+    await FirebaseFirestore.instance
+        .collection("Favorites")
+        .add(favoriteData);
+  } catch (e) {
+    print("Lỗi khi thêm vào danh sách yêu thích: $e");
+    throw e;
+  }
+}
+
+// Kiểm tra sản phẩm có trong danh sách yêu thích không
+Future<bool> isProductFavorite(String userEmail, String productId) async {
+  try {
+    QuerySnapshot favorites = await FirebaseFirestore.instance
+        .collection("Favorites")
+        .where("UserEmail", isEqualTo: userEmail)
+        .where("ProductId", isEqualTo: productId)
+        .get();
+    
+    return favorites.docs.isNotEmpty;
+  } catch (e) {
+    print("Lỗi khi kiểm tra sản phẩm yêu thích: $e");
+    return false;
+  }
+}
+
+// Lấy danh sách sản phẩm yêu thích của người dùng
+Future<Stream<QuerySnapshot>> getFavorites(String userEmail) async {
+  return FirebaseFirestore.instance
+      .collection("Favorites")
+      .where("UserEmail", isEqualTo: userEmail)
+      .snapshots();
+}
 }

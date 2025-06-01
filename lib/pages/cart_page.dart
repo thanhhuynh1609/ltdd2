@@ -92,6 +92,7 @@ class _CartPageState extends State<CartPage> {
               "Tiếp tục mua sắm",
               style: TextStyle(
                 fontSize: 16,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
