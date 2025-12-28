@@ -82,3 +82,55 @@ Tài khoản demo
 Admin
 Username: admin
 Password: admin123
+
+
+## UI Demo
+
+### Customer Interface
+
+| Home Page | Product Details |
+|---|---|
+| ![Home Page](img_readme/home.jpg) | ![Product Details](img_readme/productdetail.jpg) |
+
+| Profile | Chat with admin |
+|---|---|
+| ![Profile](img_readme/profile.jpg) | ![Chat with admin](img_readme/chatwithadmin.jpg) |
+
+| Search Page | Wishlist |
+|---|---|
+| ![Search Page](img_readme/search.jpg) | ![Wishlist](img_readme/wishlist.jpg) |
+
+| Wallet | Add money |
+|---|---|
+| ![Wallet](img_readme/wallet.jpg) | ![Add money](img_readme/moneywallet.jpg) |
+
+| Checkout | Stripe |
+|---|---|
+| ![Checkout](img_readme/checkout.jpg) | ![Stripe](img_readme/stripe.jpg) |
+
+| Order | Refund request |
+|---|---|
+| ![Order](img_readme/order.jpg) | ![Refund request](img_readme/refundrequest.jpg) |
+
+
+ADMIN
+
+| Admin home | Chat management |
+|---|---|
+| ![Admin home](img_readme/adminhome.jpg) | ![Chat management](img_readme/adminchat.jpg) |
+
+Order management
+![Admin](img_readme/ordersmanagement.jpg)
+
+Refund Management
+![Admin](img_readme/refundmanagement.jpg)
+
+Products Management
+![Admin](img_readme/productsmanagement.jpg)
+
+
+Users Management
+![Admin](img_readme/usersmanagemet.jpg)
+
+Coupon Management
+![Admin](img_readme/couponmanagement.jpg)
